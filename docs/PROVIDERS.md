@@ -75,10 +75,11 @@ It adds a command to `~/.claude/settings.json` only if no custom statusline exis
 | Token | Local Claude Code OAuth access token from `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR` honored) |
 | Mapping | `five_hour` = **Session** (300 min), `seven_day` = **Week** (10080 min); `utilization` is already a percentage |
 | Rate | At most one request per 5 min (reply cached); failures back off via the per-provider retry cooldown |
+| Renewal | The access token lasts about 8 hours and Claude Code desktop does not rewrite the file. Within 10 min of `expiresAt` the worker runs the official `claude auth status` (no model turn, output discarded, 10 s timeout) so Claude Code renews its own login, then rereads the file |
 | Guards | Endpoint allowlisted in `tools/host_security.py`; token read only inside the quota worker subprocess, never logged, stored or passed in arguments; no model turn |
 
 > [!WARNING]
-> This is an approved exception to the documented-sources-only policy. The endpoint is undocumented and may change or vanish. LimitBuddy only reads the existing login; it never asks for, refreshes or copies Claude credentials. Without bridge and credentials, status stays activity-only.
+> This is an approved exception to the documented-sources-only policy. The endpoint is undocumented and may change or vanish. LimitBuddy only reads the existing login; it never asks for, writes or copies Claude credentials; only the official CLI renews them. Without bridge and credentials, status stays activity-only.
 
 Live lifecycle events are a separate opt-in: [Live provider events](LIVE_PROVIDER_EVENTS.md).
 

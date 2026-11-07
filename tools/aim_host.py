@@ -31,7 +31,8 @@ from provider_catalog import selected_providers
 from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
 from claude_paths import config_root
-from host_security import open_provider_request, read_local_json, safe_text, serial_port
+from host_security import (allowed_executable, open_provider_request, path_executable, read_local_json,
+                           safe_text, serial_port)
 import private_files
 import queue
 import subprocess
@@ -405,6 +406,8 @@ def fetch_codex():
 
 CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 CLAUDE_MIN_FETCH_SECONDS = 300  # The undocumented endpoint rate-limits aggressively.
+CLAUDE_RENEW_MARGIN_MS = 10 * 60 * 1000
+CLAUDE_RENEW_TIMEOUT_SECONDS = 10
 
 
 def claude_credentials():
@@ -422,12 +425,43 @@ def claude_reset_iso(value):
     return now_iso_epoch(moment.timestamp())
 
 
+def claude_command():
+    local = Path.home() / ".local/bin" / ("claude.exe" if os.name == "nt" else "claude")
+    for candidate in (path_executable("claude.exe" if os.name == "nt" else "claude"), str(local)):
+        if candidate and allowed_executable(candidate):
+            return candidate
+    return None
+
+
+def renew_claude_login():
+    """Let the official Claude Code CLI renew its own login file; no model turn, no output kept."""
+    command = claude_command()
+    if not command:
+        return
+    try:
+        subprocess.run([command, "auth", "status"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=CLAUDE_RENEW_TIMEOUT_SECONDS, check=False,
+                       creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+    except (OSError, subprocess.SubprocessError):
+        pass  # The request below then reports the expired login.
+
+
+def claude_oauth():
+    auth = read_local_json(claude_credentials())
+    oauth = auth.get("claudeAiOauth") if isinstance(auth, dict) else None
+    return oauth if isinstance(oauth, dict) else {}
+
+
 def fetch_claude():
     """Claude plan quota via the local Claude Code OAuth login (read-only; token stays in memory)."""
     try:
-        auth = read_local_json(claude_credentials())
-        oauth = auth.get("claudeAiOauth") if isinstance(auth, dict) else None
-        access = credential((oauth or {}).get("accessToken") if isinstance(oauth, dict) else None)
+        oauth = claude_oauth()
+        expires = oauth.get("expiresAt")
+        # Claude Code desktop does not rewrite this file, so its 8-hour token lapses unless the CLI renews it.
+        if type(expires) in (int, float) and expires - time.time() * 1000 < CLAUDE_RENEW_MARGIN_MS:
+            renew_claude_login()
+            oauth = claude_oauth()
+        access = credential(oauth.get("accessToken"))
         req = urllib.request.Request(CLAUDE_USAGE_URL)
         req.add_header("Authorization", "Bearer " + access)
         req.add_header("anthropic-beta", "oauth-2025-04-20")

@@ -703,6 +703,35 @@ class ProviderTests(unittest.TestCase):
             if reply is None: request.assert_not_called()
             self.assertNotIn('token', str(notice))
 
+    def test_claude_login_is_renewed_by_official_cli_only_when_expiring(self):
+        now_ms = 1_800_000_000_000
+        reply = {"five_hour": {"utilization": 1, "resets_at": None}}
+        cases = ((now_ms - 1, True), (now_ms + host.CLAUDE_RENEW_MARGIN_MS + 60_000, False))
+        for expires, renews in cases:
+            stale = {'claudeAiOauth': {'accessToken': 'old-token', 'expiresAt': expires}}
+            fresh = {'claudeAiOauth': {'accessToken': 'new-token', 'expiresAt': now_ms + 8 * 3600_000}}
+            with self.subTest(renews=renews), patch.object(host.time, 'time', return_value=now_ms / 1000), \
+                    patch.object(host, 'read_local_json', side_effect=[stale, fresh]), \
+                    patch.object(host, 'renew_claude_login') as renew, \
+                    patch.object(host, "open_provider_request", return_value=self.response(reply)) as request:
+                rows, notice = host.fetch_claude()
+            self.assertIsNone(notice)
+            self.assertEqual(renew.called, renews)
+            sent = request.call_args.args[0].get_header("Authorization")
+            self.assertEqual(sent, "Bearer " + ("new-token" if renews else "old-token"))
+
+    def test_claude_renewal_runs_fixed_status_command_without_output(self):
+        with patch.object(host, 'claude_command', return_value='C:/claude.exe'), \
+                patch.object(host.subprocess, 'run') as run:
+            host.renew_claude_login()
+        args, kwargs = run.call_args
+        self.assertEqual(args[0], ['C:/claude.exe', 'auth', 'status'])
+        self.assertIs(kwargs['stdout'], host.subprocess.DEVNULL)
+        self.assertEqual(kwargs['timeout'], host.CLAUDE_RENEW_TIMEOUT_SECONDS)
+        with patch.object(host, 'claude_command', return_value=None), patch.object(host.subprocess, 'run') as run:
+            host.renew_claude_login()
+        run.assert_not_called()
+
     def test_claude_quota_reuses_recent_reply(self):
         panel = Mock(spec=[])
         rows = [{"title": "Session", "usedPercent": 1, "resetsAt": "", "windowMinutes": 300}]

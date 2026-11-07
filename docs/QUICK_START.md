@@ -15,7 +15,7 @@ flowchart LR
 2. **Start host**, then check real USB status in **Overview** / **Device** and observational links in **Agents**.
 
 > [!TIP]
-> Claude Code quota needs no extra setup when you are signed in to Claude Code on this PC: the host reads your 5-hour and 7-day quota about every 5 minutes with that login ([details](PROVIDERS.md#claude-code)). If the Claude card says "check login", use Claude Code once to renew it.
+> Claude Code quota needs no extra setup when you are signed in to Claude Code on this PC: the host reads your 5-hour and 7-day quota about every 5 minutes with that login ([details](PROVIDERS.md#claude-code)). The host renews an expiring login through the Claude Code CLI; if the card still says "check login", run `claude auth login` once.
 
 More: [provider setup](PROVIDERS.md) · [development](DEVELOPMENT.md).
 

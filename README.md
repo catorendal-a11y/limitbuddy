@@ -57,7 +57,7 @@ The PC does the reading. The display only receives numbers over USB. LimitBuddy 
 | **Gemini CLI**, **OpenCode** | ✅ | — | Nothing |
 | **Copilot**, **Cursor**, **Antigravity** | ✅ | — | An [external numeric bridge](docs/PROVIDERS.md#external-numeric-bridge) |
 
-² Claude Code desktop does not run the statusline, so LimitBuddy reads quota from Anthropic's undocumented `api/oauth/usage` endpoint using your existing login. It checks at most every 5 minutes, and the token is never logged or stored. [Details](docs/PROVIDERS.md#claude-code).
+² Claude Code desktop does not run the statusline, so LimitBuddy reads quota from Anthropic's undocumented `api/oauth/usage` endpoint using your existing login. It checks at most every 5 minutes, lets the Claude Code CLI renew the login when it expires, and never logs or stores the token. [Details](docs/PROVIDERS.md#claude-code).
 
 ## Install (Windows 10/11 x64)
 
@@ -98,7 +98,7 @@ You also need a USB **data** cable. The ZIP includes both firmwares, so you don'
 | `limitbuddy` not recognized | Open a **new** terminal after installing. |
 | Display says **NO HOST** | Go to **Settings > Start host** and check the port. |
 | No USB connection | Use a data cable, pick the right port, and close other serial tools. |
-| Claude card says "check login" | Open Claude Code once; the card recovers on the next check. |
+| Claude card says "check login" | The host renews the login with the Claude Code CLI automatically. If it persists, run `claude auth login` once. |
 | Codex quota unavailable | Finish the official CLI sign-in in **Provider setup**. |
 | Robot does not react | It follows token *increases*, and some tools save usage late. Check **Device > Check USB**. |
 | Anything else | Use **History > Diagnostic export** (it contains no keys or conversations) and open an [issue](https://github.com/catorendal-a11y/limitbuddy/issues). |

@@ -34,9 +34,10 @@ The host also calls the undocumented `GET https://api.anthropic.com/api/oauth/us
 | When | Only for the selected Claude provider, when the statusline bridge supplies no fresh quota and the credentials file exists ([Providers](PROVIDERS.md#claude-code)) |
 | Transport | URL in `PROVIDER_ENDPOINTS`; verified TLS, 20 s timeout, redirect-rejecting opener |
 | Credential | Local Claude Code OAuth access token from `.credentials.json` in `~/.claude` (or `CLAUDE_CONFIG_DIR`); read only inside the quota worker subprocess, never the main host |
+| Renewal | Within 10 min of `expiresAt` the worker runs the official Claude Code CLI as `claude auth status` (fixed arguments, absolute path from PATH or `~/.local/bin`, never the project folder; stdin/stdout/stderr discarded; 10 s timeout; no model turn). Claude Code rewrites its own file; LimitBuddy never writes it |
 | Exposure | Token never written to settings, status or logs, never copied into replies or panel data, never a command-line argument; worker stdin carries only a `key` field, empty for Claude |
 | Rate | Successful reply reused for 5 minutes (`CLAUDE_MIN_FETCH_SECONDS`); undocumented endpoint may change or rate-limit; failures show a quota notice |
 | Residual | Same-account processes can already read `.credentials.json`; this adds no access but makes the monitor a token consumer. No model turn is started |
-| Tests | `tests/test_aim_host.py`: headers, percentage mapping, missing token, 5-minute reuse, with synthetic tokens. Tests never call the real endpoint; it was checked once on the owner's ESP32-P4 with the owner's login, without printing token or reply |
+| Tests | `tests/test_aim_host.py`: headers, percentage mapping, missing token, renewal only near expiry, fixed renewal command, 5-minute reuse, with synthetic tokens. Tests never call the real endpoint; it was checked once on the owner's ESP32-P4 with the owner's login, without printing token or reply |
 
 References: [HTTPRedirectHandler](https://docs.python.org/3/library/urllib.request.html#urllib.request.HTTPRedirectHandler), [shutil.which](https://docs.python.org/3/library/shutil.html#shutil.which).
