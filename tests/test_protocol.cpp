@@ -113,6 +113,9 @@ static void invalid_frame_keeps_snapshot() {
       frame("[{\"title\":\"S\",\"usedPercent\":20,\"windowMinutes\":\"300\"}]"),
       frame("[{\"title\":\"S\",\"usedPercent\":20,\"windowMinutes\":300.5}]"),
       frame("[{\"title\":\"S\",\"usedPercent\":20,\"windowMinutes\":true}]"),
+      // Text fields must be strings (or absent), never silently blanked.
+      frame("[{\"title\":123,\"usedPercent\":20}]"),
+      frame("[{\"title\":\"S\",\"usedPercent\":20,\"resetsAt\":42}]"),
       "{\"schemaVersion\":1,\"frameId\":9,\"data\":[{\"provider\":\"codex\",\"viewIndex\":0,"
       "\"usage\":{\"primary\":{\"usedPercent\":20,\"windowMinutes\":\"300\"}}}]}\n",
   };
@@ -141,6 +144,7 @@ static void set_views_clears_old_data_and_rejects_bad_keys() {
       "{\"cmd\":\"set_views\",\"views\":[\"codex\"],\"interval\":\"20\"}",
       "{\"cmd\":\"set_views\",\"views\":[\"codex\"],\"interval\":3.5}",
       "{\"cmd\":\"set_views\",\"views\":[\"codex\"],\"active\":true}",
+      "{\"cmd\":\"set_views\",\"views\":[\"codex\"],\"mode\":5}",
   };
   for (const auto* text : typed) {
     core.clear_out();
@@ -155,6 +159,16 @@ static void set_views_clears_old_data_and_rejects_bad_keys() {
   CHECK(core.snapshot().viewCount == 2);
   CHECK(core.snapshot().viewIntervalSeconds == 20);
   CHECK(core.snapshot().activeView == 1);
+}
+
+static void rejected_commands_do_not_renew_host_lease() {
+  aim::ProtoCore core;
+  for (const char* text : {"{\"cmd\":\"reboot\"}\n", "{\"cmd\":\"wifi_scan\"}\n", "{\"cmd\":\"bogus\"}\n"}) {
+    core.clear_out();
+    feed(core, text);
+    CHECK(core.out().find("\"type\":\"error\"") != std::string::npos);
+    CHECK(!core.snapshot().hostPresent);
+  }
 }
 
 static void brightness_rejects_invalid_values() {
@@ -1065,6 +1079,7 @@ int main() {
   timestamp_and_ack();
   invalid_frame_keeps_snapshot();
   set_views_clears_old_data_and_rejects_bad_keys();
+  rejected_commands_do_not_renew_host_lease();
   brightness_rejects_invalid_values();
   framing_timeout_and_overflow_recover();
   brightness_honors_persistence_and_queue_failure();

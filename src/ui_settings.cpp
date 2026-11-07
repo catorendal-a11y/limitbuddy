@@ -693,7 +693,7 @@ void ui_settings_init() {
   make_button(quotaOverlay, 616, 406, 136, "DONE", close_quota, nullptr);
   lv_obj_set_hidden(quotaOverlay, true);
   ui_theme::watch(settingsScreen); refresh_appearance();
-  saveFeedback = make_label(lv_layer_top(), 590, 406, 186, "", &lv_font_montserrat_12, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
+  saveFeedback = make_label(lv_layer_top(), 590, 406, 186, "", &lv_font_montserrat_12, ui_theme::accent, LV_TEXT_ALIGN_CENTER);
   lv_obj_set_hidden(saveFeedback, true);
 }
 
@@ -721,7 +721,8 @@ void ui_settings_update() {
   const bool choosing = !lv_obj_is_hidden(appearanceOverlay) || !lv_obj_is_hidden(quotaOverlay) ||
                         !lv_obj_is_hidden(alertsOverlay) || !lv_obj_is_hidden(nightOverlay);
   if (choosing && lv_obj_get_index(saveFeedback) != static_cast<int32_t>(lv_obj_get_child_count(lv_layer_top())) - 1) lv_obj_move_foreground(saveFeedback);
-  const int x = choosing ? 48 : 590, y = choosing ? 446 : 406;
+  // Overlays fill the lower rows; the empty top centre keeps feedback clear of their cards and dimmed buttons.
+  const int x = choosing ? 307 : 590, y = choosing ? 4 : 406;
   if (lv_obj_get_x(saveFeedback) != x || lv_obj_get_y(saveFeedback) != y) lv_obj_set_pos(saveFeedback, x, y);
   if (lv_screen_active() == settingsScreen && !lv_obj_has_state(brightnessSlider, LV_STATE_PRESSED)) refresh_brightness();
   if (shownSaveRevision != app_settings::save_revision()) {

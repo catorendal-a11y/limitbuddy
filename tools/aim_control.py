@@ -375,7 +375,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", action="store_true", help="Run the background companion")
     parser.add_argument('--start-host', action='store_true', help='Start this installation\'s independent background host')
-    parser.add_argument('--quota-worker', choices=('codex', 'zcode'), help=argparse.SUPPRESS)
+    parser.add_argument('--quota-worker', choices=('codex', 'zcode', 'claude'), help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true", help="Show local diagnostics without connecting to the panel or API")
     parser.add_argument('--integrations', action='store_true', help='Open selected provider integrations interactively')
     parser.add_argument('--setup-codex', action='store_true', help='Install/sign in the explicitly selected official Codex CLI')

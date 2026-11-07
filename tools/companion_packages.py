@@ -10,6 +10,7 @@ import stat
 import struct
 import tempfile
 import zipfile
+import zlib
 from itertools import islice
 
 MAX_BLOB=2*1024*1024
@@ -142,7 +143,8 @@ def parse_archive(raw):
                 if archive.getinfo(frame['file']).file_size!=frame['encodedBytes']:raise ValueError('Wrong companion asset size')
                 blob+=archive.read(frame['file'])
             return parse_blob(blob)
-    except (zipfile.BadZipFile,KeyError,NotImplementedError,RuntimeError,OverflowError) as error:
+    # Corrupt deflate data surfaces as zlib.error/EOFError while reading members.
+    except (zipfile.BadZipFile,KeyError,NotImplementedError,RuntimeError,OverflowError,zlib.error,EOFError) as error:
         raise ValueError('Invalid companion archive') from error
 
 

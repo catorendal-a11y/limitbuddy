@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import aim_events
 from aim_host import Panel
-from telemetry_bridge import write_record
+from telemetry_bridge import prune_records, write_record
 from token_activity import TokenReporter, TokenSampler
 
 
@@ -23,6 +23,18 @@ class AgentPipelineTests(unittest.TestCase):
         self.activity = self.root / 'tools/activity'
         write_record(self.root / 'tools/aim_host.json', {'providers': ['codex']})
         write_record(self.activity / 'codex-session-link.json', {'enabled': True, 'generation': 17})
+
+    def test_pruning_tolerates_records_removed_by_a_concurrent_hook(self):
+        folder = self.root / 'prune'
+        for index in range(4): write_record(folder / f'{index}.json', {'n': index})
+        vanished = folder / '0.json'
+        real_stat = Path.stat
+        def racing_stat(path, *args, **kwargs):
+            if path == vanished: vanished.unlink(missing_ok=True)
+            return real_stat(path, *args, **kwargs)
+        with patch.object(Path, 'stat', racing_stat):
+            prune_records(folder, 2)
+        self.assertEqual(len(list(folder.glob('*.json'))), 2)
 
     def observe(self):
         payload = dict(session_id='synthetic-session', hook_event_name='PreToolUse',

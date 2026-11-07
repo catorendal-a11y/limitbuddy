@@ -25,8 +25,14 @@ class DocsEncodingTests(unittest.TestCase):
     def test_tracked_text_contains_no_double_encoded_characters(self):
         files = subprocess.run(['git', 'ls-files'], cwd=ROOT, capture_output=True,
                                text=True, encoding='utf-8', errors='replace')
-        self.assertEqual(files.returncode, 0, 'git ls-files must list the tracked files')
-        tracked = files.stdout.split()
+        if files.returncode == 0:
+            tracked = files.stdout.split()
+        else:  # source archive without .git: scan the shipped text files instead
+            skip = {'.git', '.venv', '.pio', 'work', 'runtime', 'node_modules', '__pycache__'}
+            tracked = [str(path.relative_to(ROOT)) for path in ROOT.rglob('*')
+                       if path.is_file() and not skip.intersection(path.relative_to(ROOT).parts)
+                       and path.suffix.lower() in {'.md', '.py', '.cpp', '.h', '.c', '.ps1', '.bat',
+                                                   '.cmd', '.ini', '.json', '.yml', '.txt', '.cjs'}]
         self.assertTrue(tracked, 'the repository must track files')
         failures = []
         for name in tracked:

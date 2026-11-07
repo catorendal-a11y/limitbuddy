@@ -405,6 +405,8 @@ class ProtoCore {
         if (!row["usedPercent"].is<float>()) return false;
         r.usedPercent = row["usedPercent"].as<float>();
         if (!std::isfinite(r.usedPercent) || r.usedPercent < 0 || r.usedPercent > 100) return false;
+        if (!row["title"].isNull() && !row["title"].is<const char*>()) return false;
+        if (!row["resetsAt"].isNull() && !row["resetsAt"].is<const char*>()) return false;
         copy_capped(r.title, sizeof(r.title), row["title"] | (const char*)"");
         short_reset(row["resetsAt"] | (const char*)"", r.resetsShort, sizeof(r.resetsShort));
         // windowMinutes identifies a quota window (matching, NVS rules); reject
@@ -732,6 +734,9 @@ class ProtoCore {
       if (!doc["requestId"].is<uint32_t>() || doc["requestId"].as<uint32_t>() != snap_.refreshId || !snap_.refreshId || !refresh_pending()) {
         reply_error(-1, 0, "unknown refresh request"); return;
       }
+      if (!doc["message"].isNull() && !doc["message"].is<const char*>()) {
+        reply_error(-1, 0, "invalid refresh status"); return;
+      }
       const char* state = doc["state"] | "";
       if (strcmp(state, "waiting") == 0) snap_.refreshState = RefreshState::waiting;
       else if (strcmp(state, "updating") == 0) snap_.refreshState = RefreshState::updating;
@@ -762,6 +767,10 @@ class ProtoCore {
           reply_error(-1, 0, "set_views: unsupported provider");
           return;
         }
+      }
+      if (!doc["mode"].isNull() && !doc["mode"].is<const char*>()) {
+        reply_error(-1, 0, "set_views: invalid mode");
+        return;
       }
       const char* mode = doc["mode"] | "manual";
       if (strcmp(mode, "manual") != 0 && strcmp(mode, "automatic") != 0) {
@@ -821,10 +830,13 @@ class ProtoCore {
       // Deliberate deviation from the reference firmware: the companion app
       // never restarts this display.
       reply_error(-1, 0, "reboot disabled on this device");
+      return;  // Rejected commands must not renew the host lease.
     } else if (strncmp(cmd, "wifi_", 5) == 0) {
       reply_error(-1, 0, "wifi not supported on this device");
+      return;
     } else {
       reply_error(-1, 0, "unknown command");
+      return;
     }
     note_host_seen();
   }

@@ -7,7 +7,7 @@ import re
 import time
 from host_security import read_local_json
 from provider_catalog import PROVIDERS
-from telemetry_bridge import write_record
+from telemetry_bridge import prune_records, write_record
 
 STATES = frozenset(('idle', 'running', 'waiting', 'completed', 'error', 'closed'))
 LEASE_SECONDS = 900
@@ -45,8 +45,7 @@ def ingest_event(provider, payload, directory, now=None, generation=None):
         folder=folder/str(generation)
         record['generation']=generation
     write_record(folder/(key+'.json'),record)
-    paths = sorted(folder.glob('*.json'), key=lambda p:p.stat().st_mtime, reverse=True)
-    for old in paths[MAX_SESSIONS:]: old.unlink()
+    prune_records(folder, MAX_SESSIONS)
 
 
 def claude_event(payload, directory, now=None, generation=None):
