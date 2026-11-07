@@ -6,7 +6,7 @@ Scope: PC companion, official-client setup, USB input, local configuration, prov
 
 | Finding | Impact and resolution |
 | --- | --- |
-| Provider requests followed default HTTP redirects | A redirect could forward Authorization. **All redirects are now rejected** (including HTTPS-to-HTTP and same-origin). Only allowlisted quota URLs open (`PROVIDER_ENDPOINTS` in `tools/host_security.py`; three as of v1.19.1-rc25, see addendum). Tests use the real opener with a synthetic HTTPS handler and verify no second request |
+| Provider requests followed default HTTP redirects | A redirect could forward Authorization. **All redirects are now rejected** (including HTTPS-to-HTTP and same-origin). Only allowlisted quota URLs open (`PROVIDER_ENDPOINTS` in `tools/host_security.py`; three as of v1.19.1-rc26, see addendum). Tests use the real opener with a synthetic HTTPS handler and verify no second request |
 | Implicit current-directory executable discovery | A planted Codex executable could be picked from a project folder. Discovery now scans only absolute PATH directories, rejects the current directory and the monitor tree, and uses an absolute system PowerShell path. The official CLI remains a trusted local dependency |
 | Unconstrained serial paths and terminal text | Serial settings reject network URLs and /dev/ traversal. Panel rejection details are not copied into host exceptions. Log lines strip terminal controls and are length-bounded. Config reads limited to 64 KiB |
 | Mutable workflow references, old installer | Actions pinned to verified commits, dependency audit in CI, Dependabot updates. Build environment and source setup use pip 26.2.1 (older pip had advisories) |
@@ -25,7 +25,7 @@ Scope: PC companion, official-client setup, USB input, local configuration, prov
 - Git history and release archives exclude local keys, auth files, databases and logs.
 - The extracted program and command scripts are not Authenticode-signed ([Windows trust](WINDOWS_TRUST.md)). Trust assumptions and private reporting: [Security](../SECURITY.md).
 
-## Addendum: Claude plan quota endpoint (v1.19.1-rc25)
+## Addendum: Claude plan quota endpoint (v1.19.1-rc26)
 
 The host also calls the undocumented `GET https://api.anthropic.com/api/oauth/usage` (`fetch_claude` in `tools/aim_host.py`). The three allowlisted endpoints are the Codex and Z.AI URLs plus this one.
 

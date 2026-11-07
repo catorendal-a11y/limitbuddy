@@ -1,3 +1,28 @@
+# LimitBuddy v1.19.1-rc26
+
+## Claude quota is back
+
+- **5 HOURS / 7 DAYS for Claude Code without setup.** Claude Code desktop never runs the statusline,
+  and the CLI stopped sending `rate_limits` there in 2.1.138, so the Claude card had lost its quota.
+  The host now reads it with your existing Claude Code login (undocumented `api/oauth/usage`), at most
+  every 5 minutes. The token is read only inside the quota worker and is never logged or stored. A
+  fresh statusline reading still wins.
+- **The login no longer lapses after 8 hours.** Claude Code desktop does not renew the login file, so
+  shortly before it expires the host runs the official `claude auth status` (no model turn) and Claude
+  Code renews its own login. LimitBuddy never writes credentials.
+
+## Fixes
+
+- Quota worker cleanup notice, private log and configuration writes, pruned bridge records and safer
+  companion pack decompression errors.
+- Display: correct page mapping and shared session status, settings save feedback in its own spot,
+  stricter protocol types and lease handling.
+
+## Documentation
+
+- Every document checked against the code, then shortened by about a third with tables, callouts and
+  25 diagrams. The README is half as long, with a companion gallery and install flow.
+
 # LimitBuddy v1.19.1-rc25
 
 ## Fix: WRAITH and GLITCH on the P4 display
