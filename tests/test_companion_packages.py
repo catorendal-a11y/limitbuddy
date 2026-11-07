@@ -37,6 +37,13 @@ class CompanionPackageTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
 
+    def test_corrupt_deflate_stream_is_rejected_as_invalid_archive(self):
+        raw=bytearray(archive())
+        with zipfile.ZipFile(io.BytesIO(bytes(raw))) as z:info=z.getinfo('manifest.json')
+        start=info.header_offset+30+len(info.filename.encode())+len(info.extra)
+        raw[start:start+info.compress_size]=bytes([0xff])*info.compress_size
+        with self.assertRaises(ValueError):self.p.parse_archive(bytes(raw))
+
     def test_verified_archive_becomes_content_addressed_payload_without_extraction(self):
         pack=self.p.parse_archive(archive())
         self.assertEqual(pack.name,'Fixture Robot')

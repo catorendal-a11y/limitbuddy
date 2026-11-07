@@ -326,7 +326,7 @@ class TerminalApp(App):
     def show_packs(self,result):
         rows=result['packs'];choices=[(row['name'],row['id']) for row in rows]
         self.form('COMPANION PACKS',[
-            ('operation','Action','select','builtin',[('Use built-in NOVA / ORBIT','builtin'),('Use selected pack','select_pack'),('Import and use pack','import_pack'),('Remove unused pack','remove_pack')]),
+            ('operation','Action','select','builtin',[('Use built-in companion','builtin'),('Use selected pack','select_pack'),('Import and use pack','import_pack'),('Remove unused pack','remove_pack')]),
             ('id','Saved pack','select',result['selected'] if any(key==result['selected'] for _,key in choices) else None,choices),
             ('path','Pack archive path (for import)','text','',None),
             ('confirm','Type IMPORT for import or REMOVE for removal','text','',None)],'pack-change',

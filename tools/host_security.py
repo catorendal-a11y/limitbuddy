@@ -12,6 +12,7 @@ import urllib.request
 PROVIDER_ENDPOINTS = frozenset((
     'https://chatgpt.com/backend-api/wham/usage',
     'https://api.z.ai/api/monitor/usage/quota/limit',
+    'https://api.anthropic.com/api/oauth/usage',
 ))
 PROJECT = Path(sys.executable).resolve().parent if getattr(sys, 'frozen', False) else Path(__file__).resolve().parents[1]
 

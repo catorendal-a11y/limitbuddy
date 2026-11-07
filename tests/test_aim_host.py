@@ -679,6 +679,41 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(rows[1]["windowMinutes"], 1440)
         self.assertEqual(rows[1]["title"], "Secondary")
 
+    def test_claude_oauth_usage_maps_percentages_and_sends_beta_header(self):
+        context = self.response({"five_hour": {"utilization": 4.0, "resets_at": "2026-11-07T15:00:00.123456+00:00"},
+                                 "seven_day": {"utilization": 0.5, "resets_at": None}, "limits": []})
+        with patch.object(host, 'read_local_json', return_value={'claudeAiOauth': {'accessToken': 'test-token'}}), \
+                patch.object(host, "open_provider_request", return_value=context) as request:
+            rows, notice = host.fetch_claude()
+        self.assertIsNone(notice)
+        sent = request.call_args.args[0]
+        self.assertEqual(sent.full_url, host.CLAUDE_USAGE_URL)
+        self.assertEqual(sent.get_header("Anthropic-beta"), "oauth-2025-04-20")
+        self.assertEqual([(r["title"], r["windowMinutes"], r["usedPercent"], r["resetsAt"]) for r in rows],
+                         [("Session", 300, 4.0, "2026-11-07T15:00:00Z"), ("Week", 10080, 0.5, "")])
+
+    def test_claude_oauth_usage_rejects_missing_token_and_empty_windows(self):
+        for auth, reply in (({}, None), ({'claudeAiOauth': {'accessToken': 'bad\ntoken'}}, None),
+                            ({'claudeAiOauth': {'accessToken': 'test-token'}}, {"five_hour": None, "seven_day": None}),
+                            ({'claudeAiOauth': {'accessToken': 'test-token'}}, {"five_hour": {"utilization": "x"}})):
+            with self.subTest(auth=auth, reply=reply), patch.object(host, 'read_local_json', return_value=auth), \
+                    patch.object(host, "open_provider_request", return_value=self.response(reply or {})) as request:
+                rows, notice = host.fetch_claude()
+            self.assertIsNone(rows); self.assertTrue(notice)
+            if reply is None: request.assert_not_called()
+            self.assertNotIn('token', str(notice))
+
+    def test_claude_quota_reuses_recent_reply(self):
+        panel = Mock(spec=[])
+        rows = [{"title": "Session", "usedPercent": 1, "resetsAt": "", "windowMinutes": 300}]
+        with patch.object(host, 'fetch_claude', return_value=(rows, None)) as fetch:
+            self.assertEqual(host.claude_quota(panel, None), (rows, None))
+            self.assertEqual(host.claude_quota(panel, None), (rows, None))
+        fetch.assert_called_once()
+        with patch.object(host, 'fetch_claude', return_value=(None, 'Claude: rate limited; retrying')) as fetch, \
+                patch.object(host.time, 'monotonic', return_value=panel.claude_quota[0] + host.CLAUDE_MIN_FETCH_SECONDS):
+            self.assertEqual(host.claude_quota(panel, None), (None, 'Claude: rate limited; retrying'))
+
     def test_oversized_codex_auth_is_rejected_before_network(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'auth.json'

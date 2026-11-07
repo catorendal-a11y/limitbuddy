@@ -529,7 +529,12 @@ void update() {
     if (snapshot.views[v].valid || (snapshot.viewsConfigured && snapshot.viewKeys[v][0])) indices[count++] = v;
   }
   pageCount = static_cast<uint8_t>(count ? (count + 1) / 2 : 1);
-  if (lastRevision != snapshot.viewRevision) { lastRevision = snapshot.viewRevision; page = snapshot.activeView / 2 % pageCount; }
+  if (lastRevision != snapshot.viewRevision) {
+    lastRevision = snapshot.viewRevision;
+    size_t position = 0;  // activeView is a raw slot; map it into the compacted indices.
+    for (size_t k = 0; k < count; ++k) if (indices[k] == snapshot.activeView) { position = k; break; }
+    page = static_cast<uint8_t>(position / 2 % pageCount);
+  }
   page %= pageCount;
   lv_obj_set_state(nextButton, LV_STATE_DISABLED, pageCount < 2);
   lv_obj_set_hidden(nextButton, pageCount < 2);
@@ -561,7 +566,7 @@ void update() {
     if (view.informational) snprintf(value, sizeof(value), "LOCAL");
     else if (hasRow) format_percent(remaining, true, value, sizeof(value)); else snprintf(value, sizeof(value), "--");
     text(item.percent, value);
-    lv_obj_set_hidden(item.bar, view.informational);
+    lv_obj_set_hidden(item.bar, view.informational || !hasRow);  // an empty track would read as 0%
     if (lv_bar_get_value(item.bar) != static_cast<int32_t>(remaining)) lv_bar_set_value(item.bar, remaining, LV_ANIM_OFF);
     char period[48], selectedStatus[64];
     quota_window_label(row.windowMinutes, row.title, period, sizeof(period));

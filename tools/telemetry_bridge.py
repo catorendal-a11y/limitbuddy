@@ -22,8 +22,17 @@ def ingest(provider, payload, directory):
     key = hashlib.sha256(identifier.encode()).hexdigest()
     folder = Path(directory) / provider
     write_record(folder / (key + '.json'), {'total_tokens': total, 'received_at': time.time()})
-    paths = sorted(folder.glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True)
-    for old in paths[128:]: old.unlink()
+    prune_records(folder, 128)
+
+
+def prune_records(folder, keep):
+    """Keep the newest records; concurrent hooks may delete the same files first."""
+    def modified(path):
+        try: return path.stat().st_mtime
+        except OSError: return 0
+    for old in sorted(folder.glob('*.json'), key=modified, reverse=True)[keep:]:
+        try: old.unlink(missing_ok=True)
+        except OSError: pass
 
 
 def read_counters(directory, provider):

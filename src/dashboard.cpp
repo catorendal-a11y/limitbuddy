@@ -811,6 +811,9 @@ void dashboard_update() {
   if (lv_obj_has_state(pageButton, LV_STATE_PRESSED)) return;
   const aim::Snapshot snap = aim::read();
   const uint32_t now = millis();
+  // Same session inputs as the NOVA screen, so both report one status per provider.
+  const auto agentEvents = agent::read();
+  const auto liveAgents = live_agent::read_usb();
   const bool recent = snap.frameCount != 0 && (now - snap.lastFrameMs < STALE_MS);
   size_t onlineCount = 0, activeCount = 0, fetchingCount = 0;
   for (size_t i = 0; i < aim::kMaxViews; ++i) {
@@ -824,7 +827,7 @@ void dashboard_update() {
     // from some other selected AI must not mark a missing bridge healthy.
     const bool local = view.valid && view.informational && provider &&
         ((token_signal_fresh(snap, now) && (snap.tokenSourceMask & provider->activityMask)) ||
-         session_status(snap, now, provider->activityMask).known);
+         session_status(snap, now, provider->activityMask, agentEvents, liveAgents).known);
     if (snap.hostPresent && (local || (view.valid && !view.notice && !view.fetching && view.rowCount &&
         now - view.quotaReceivedMs < STALE_MS))) ++onlineCount;
   }
@@ -900,7 +903,10 @@ void dashboard_update() {
   pageCount = static_cast<uint8_t>(std::max<size_t>(1, (used + kBigCards - 1) / kBigCards));
   if (viewRevision != snap.viewRevision) {
     viewRevision = snap.viewRevision;
-    currentPage = (snap.activeView / kBigCards) % pageCount;
+    // activeView is a raw slot; skipped slots shift the compacted entries.
+    size_t position = 0;
+    for (size_t k = 0; k < used; ++k) if (entries[k].index == snap.activeView) { position = k; break; }
+    currentPage = static_cast<uint8_t>((position / kBigCards) % pageCount);
     lastPageMs = now;
   }
   currentPage %= pageCount;
@@ -927,7 +933,7 @@ void dashboard_update() {
     card.viewIndex=entry.index;
     snprintf(card.providerKey,sizeof(card.providerKey),"%s",entry.key[0]?entry.key:entry.view->providerKey);
     render_card(card,bigCache[i],entry.view,entry.key,i,now,snap.hostPresent,
-        session_status(snap,now,entry.key));
+        session_status(snap,now,entry.key,agentEvents,liveAgents));
   }
 
   char hintBuf[96];

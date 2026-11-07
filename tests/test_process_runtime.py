@@ -76,7 +76,9 @@ class ContainmentFailureTests(unittest.TestCase):
         pool=host.FetchPool()
         with patch.object(host,'start_child',side_effect=ChildCleanupError('fixture')) as spawn:
             with self.assertRaises(ChildCleanupError): pool.fetch('zcode','',Mock())
-            with self.assertRaises(RuntimeError): pool.fetch('codex','',Mock())
+            rows,notice=pool.fetch('codex','',Mock())
+            self.assertIsNone(rows)
+            self.assertIn('cleanup unconfirmed',notice)
             self.assertEqual(spawn.call_count,1)
 
 

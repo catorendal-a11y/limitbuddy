@@ -41,7 +41,7 @@ Open the desktop **Companions** tab and choose **Import and use pack**. The ZIP 
 `manifest.json` and exactly its declared frame files, with optional `LICENSE` and `README.md`.
 Archives are never extracted or executed. Duplicate members/fields, unsafe names, unknown files,
 oversize data, invalid crops, timings, hashes or compressed blocks are rejected before selection.
-The library holds at most 16 packs. **Use built-in NOVA / ORBIT** restores normal rendering;
+The library holds at most 16 packs. **Use built-in companion** restores normal rendering;
 **Remove unused pack** cannot remove the selected pack or the user's original import file.
 
 The original archive/notices and a verified content-addressed payload stay under the PC app's

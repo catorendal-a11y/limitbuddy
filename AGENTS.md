@@ -71,6 +71,8 @@
   numeric readers and task identity. Explicit fixture homes ignore user env.
 - `tools/aim_host.py`: polling, retries, config and USB companion. Failed reloads
   retain the accepted signature/config and retry with backoff; new saves bypass it.
+  Claude quota falls back to the undocumented `/api/oauth/usage` (user-approved, because desktop
+  runs no statusline): token read in the quota worker only, never logged or stored, at most every 5 min.
 - `tools/process_runtime.py`, `tools/windows_job.py`: scoped background worker startup and verified cleanup; never target unrelated processes by name.
 - `tools/token_activity.py`: read-only numeric token activity.
 - `tools/private_files.py`: create sensitive settings/backups with protected Windows current-user/SYSTEM

@@ -52,7 +52,9 @@ inline SessionStatus session_status(const aim::Snapshot& snapshot, uint32_t now,
   return result;
 }
 
-inline SessionStatus session_status(const aim::Snapshot& snapshot, uint32_t now, const char* provider) {
+inline SessionStatus session_status(const aim::Snapshot& snapshot, uint32_t now, const char* provider,
+                                    const agent::Snapshot& events=agent::read(),
+                                    const live_agent::UsbLiveSnapshot& live=live_agent::UsbLiveSnapshot{}) {
   const auto* style = aim::provider_style(provider);
-  return session_status(snapshot, now, static_cast<uint8_t>(style ? style->activityMask : 0u));
+  return session_status(snapshot, now, static_cast<uint8_t>(style ? style->activityMask : 0u), events, live);
 }

@@ -30,6 +30,7 @@ from refresh_policy import AdaptiveRefresh
 from provider_catalog import selected_providers
 from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
+from claude_paths import config_root
 from host_security import open_provider_request, read_local_json, safe_text, serial_port
 import private_files
 import queue
@@ -119,6 +120,7 @@ def LOG(msg):
                 private_files.write_bytes(LOG_PATH, b"")
             elif LOG_PATH.stat().st_size >= 1_000_000:
                 os.replace(LOG_PATH, LOG_PATH.with_suffix(".log.1"))
+                private_files.write_bytes(LOG_PATH, b"")  # the fresh log keeps current-user protection
             with open(LOG_PATH, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
         except (OSError, ValueError):
@@ -215,7 +217,7 @@ def load_config():
     out["zai_key"] = zcode_key(out)
     # Keep existing configuration and credentials untouched at startup.
     if not CONFIG_PATH.exists():
-        CONFIG_PATH.write_text(json.dumps(DEFAULT_CONFIG, indent=2), encoding="utf-8")
+        private_files.write_json(CONFIG_PATH, DEFAULT_CONFIG)  # later holds zai_key: protect before content
     return out
 
 
@@ -399,6 +401,58 @@ def fetch_codex():
         return None, http_notice("Codex", error)
     except Exception as e:
         return None, provider_failure("Codex", e)
+
+
+CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+CLAUDE_MIN_FETCH_SECONDS = 300  # The undocumented endpoint rate-limits aggressively.
+
+
+def claude_credentials():
+    return config_root() / ".credentials.json"
+
+
+def claude_reset_iso(value):
+    if value is None:
+        return ""
+    if not isinstance(value, str) or len(value) > 64:
+        raise ValueError("Invalid reset time")
+    moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        raise ValueError("Reset time lacks a timezone")
+    return now_iso_epoch(moment.timestamp())
+
+
+def fetch_claude():
+    """Claude plan quota via the local Claude Code OAuth login (read-only; token stays in memory)."""
+    try:
+        auth = read_local_json(claude_credentials())
+        oauth = auth.get("claudeAiOauth") if isinstance(auth, dict) else None
+        access = credential((oauth or {}).get("accessToken") if isinstance(oauth, dict) else None)
+        req = urllib.request.Request(CLAUDE_USAGE_URL)
+        req.add_header("Authorization", "Bearer " + access)
+        req.add_header("anthropic-beta", "oauth-2025-04-20")
+        req.add_header("User-Agent", "LimitBuddy/" + numeric_version(HOST_VERSION))
+        with open_provider_request(req) as r:
+            data = read_json_response(r)
+        rows = []
+        for name, title, minutes in (("five_hour", "Session", 300), ("seven_day", "Week", 10080)):
+            window = data.get(name)
+            if window is None:
+                continue
+            if not isinstance(window, dict):
+                raise ValueError("Invalid quota window")
+            if window.get("utilization") is None:
+                continue
+            # utilization is already a percentage (4.0 means 4 %), never a fraction.
+            rows.append({"title": title, "usedPercent": percent_value(window["utilization"]),
+                         "resetsAt": claude_reset_iso(window.get("resets_at")), "windowMinutes": minutes})
+        if not rows:
+            return None, "Claude: no plan quota in response"
+        return rows, None
+    except urllib.error.HTTPError as error:
+        return None, http_notice("Claude", error)
+    except Exception as e:
+        return None, provider_failure("Claude", e)
 
 
 def fetch_zcode(api_key):
@@ -768,6 +822,9 @@ def connect_panel(port_name, views, board_id='guition-p4'):
         raise
 
 
+QUOTA_WORKERS = ('codex', 'zcode', 'claude')
+
+
 class FetchPool:
     """Bounded quota subprocesses: deadlines reap the transport before retrying.
 
@@ -781,7 +838,7 @@ class FetchPool:
 
     @staticmethod
     def command(provider):
-        if provider not in ('codex', 'zcode'): raise ValueError('Unsupported quota worker')
+        if provider not in QUOTA_WORKERS: raise ValueError('Unsupported quota worker')
         if getattr(sys, 'frozen', False):
             helper = HERE.parent / 'AI-Monitor-Console.exe'
             if not helper.is_file(): raise FileNotFoundError('Console helper missing')
@@ -795,7 +852,8 @@ class FetchPool:
 
     def fetch(self, provider, key, panel):
         if self.cleanup_failed or self.process is not None:
-            raise RuntimeError('Previous quota worker cleanup is unconfirmed; retry blocked.')
+            # Stay blocked without raising: an exception here would reopen the serial owner every cycle.
+            return None, f'{provider}: quota worker cleanup unconfirmed; restart the PC host'
         started = last_heartbeat = time.monotonic()
         cycle_deadline = getattr(panel, 'cycle_deadline', None)
         deadline = started + self.request_seconds
@@ -876,11 +934,12 @@ def quota_worker(provider):
     """Internal allowlisted numeric-only worker; never dispatch remote commands."""
     try:
         raw = sys.stdin.buffer.read(MAX_RESPONSE_BYTES + 1)
-        if provider not in ('codex', 'zcode') or len(raw) > MAX_RESPONSE_BYTES: return 1
+        if provider not in QUOTA_WORKERS or len(raw) > MAX_RESPONSE_BYTES: return 1
         data = json.loads(raw)
         if not isinstance(data, dict) or set(data) != {'key'}: return 1
         key = credential(data['key'], optional=True)
-        rows, notice = fetch_codex() if provider == 'codex' else fetch_zcode(key)
+        rows, notice = (fetch_codex() if provider == 'codex' else fetch_claude() if provider == 'claude'
+                        else fetch_zcode(key))
         reply = json.dumps({'rows':rows, 'notice':str(notice) if notice else None,
                             'retry_after':min(3600, max(0, int(getattr(notice, 'retry_after', 0))))}, allow_nan=False)
         if len(reply.encode()) > MAX_RESPONSE_BYTES: return 1
@@ -1164,6 +1223,17 @@ def wait_for_config(watcher, seconds, sampler=None):
         if watcher.pending is not None: return
 
 
+def claude_quota(panel, fetcher):
+    """Reuse a recent OAuth usage reply; the endpoint is queried at most every five minutes."""
+    cached = getattr(panel, 'claude_quota', None)
+    if cached and time.monotonic() - cached[0] < CLAUDE_MIN_FETCH_SECONDS:
+        return cached[1], None
+    rows, notice = fetcher.fetch('claude', '', panel) if isinstance(fetcher, FetchPool) else fetch_claude()
+    if rows and not notice:
+        panel.claude_quota = (time.monotonic(), rows)
+    return rows, notice
+
+
 def poll_cycle(cfg, zai_key, views, frame_id, panel):
     panel.last_poll_success = True
     if not isinstance(getattr(panel, "retries", None), ProviderRetries):
@@ -1194,6 +1264,8 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
             if not rows and provider not in ('claude', 'gemini', 'opencode') and read_counters(HERE / 'activity', provider) is not None:
                 notice = 'External token activity; quota unavailable'
             informational = not rows
+            if provider == 'claude' and not rows and claude_credentials().is_file():
+                rows, notice, informational = claude_quota(panel, fetcher) + (False,)
         else:
             rows, notice = None, f"{provider} not configured"
         if not rows and not informational:

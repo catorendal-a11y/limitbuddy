@@ -1588,7 +1588,7 @@ int main(int argc, char** argv) {
   app_settings::report_save(false); ui_settings_update();
   CHECK(std::string(lv_label_get_text(saveFeedback)) == "SAVE FAILED");
   CHECK(lv_obj_get_index(saveFeedback) > lv_obj_get_index(alertsOverlay));
-  CHECK(lv_obj_get_x(saveFeedback) == 48 && lv_obj_get_y(saveFeedback) == 446);
+  CHECK(lv_obj_get_x(saveFeedback) == 307 && lv_obj_get_y(saveFeedback) == 4);
   screenshot(screenshots, "settings-save-failed");
   fakeTick += 5000; ui_settings_update(); CHECK(lv_obj_is_hidden(saveFeedback));
   close_alerts(nullptr);
@@ -1627,7 +1627,7 @@ int main(int argc, char** argv) {
   ui_settings_update(); screenshot(screenshots, "settings-night-precise");
   app_settings::report_save(false); ui_settings_update();
   CHECK(lv_obj_get_index(saveFeedback) > lv_obj_get_index(nightOverlay));
-  CHECK(lv_obj_get_x(saveFeedback) == 48 && lv_obj_get_y(saveFeedback) == 446);
+  CHECK(lv_obj_get_x(saveFeedback) == 307 && lv_obj_get_y(saveFeedback) == 4);
   CHECK(!lv_obj_is_hidden(saveFeedback));
   screenshot(screenshots, "settings-night-save-failed");
   close_night(nullptr); ui_settings_hide();
