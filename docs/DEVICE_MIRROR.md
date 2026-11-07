@@ -2,9 +2,9 @@
 
 In NOVA, open **Device > Device screen**. The running host remains the only USB serial owner.
 The read-only result shows
-the actual 800×480 RGB565 pixels rendered by the device, including normal overlays. It does not
-show a desktop simulation or generated preview. The capture time and STALE marker distinguish
-a captured image from live video. Return and choose **Device screen** again for a fresh capture;
+the actual 800×480 RGB565 pixels rendered by the device, including normal overlays, scaled
+down to colored half-block cells to fit the terminal window. It does not show a desktop
+simulation or generated preview. It is a single snapshot, not live video. Close the result and choose **Device screen** again for a fresh capture;
 opening the result does not start polling.
 
 P4 pixels are captured before its manual portrait rotation; S3 pixels before its panel write.

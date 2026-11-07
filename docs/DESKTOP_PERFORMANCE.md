@@ -1,4 +1,6 @@
-# Desktop performance check
+# Desktop performance check (historical)
+
+> **Historical.** These measurements describe the Qt desktop window of v1.17.2-v1.18.1, which was retired in rc15 (the terminal replaced it). The benchmark script `scripts/benchmark_desktop.py` and the GUI measured here are no longer in the repository, so the command below cannot be rerun. Only the SQLite execution budget section still describes current numeric token readers. Nothing here measures the terminal or the display firmware; for device measurements see [P4_HARDWARE_BENCHMARKS.md](P4_HARDWARE_BENCHMARKS.md).
 
 Controlled Windows offscreen measurements on October 10, 2026 compared tagged v1.17.2 with v1.18.1. Each version used the same synthetic Copilot/COM9999 configuration. Token-source polling was mocked; no accounts, provider API calls or USB writes were used. A 20 ms event-loop probe also contributes to the reported CPU use.
 
@@ -15,7 +17,7 @@ CPU was below 1% of one core in all fixture phases. At this low load, Windows CP
 
 The first baseline startup took 454 ms and the first candidate 180 ms; DLL/file cache conditions differed. These values are not evidence of a startup speedup. The reverse-order warm repeat was effectively unchanged. Memory increased by about 1–2 MiB in the controlled source test; packaged/native rendering and real provider databases need separate measurements.
 
-Run the reproducible fixture from the public source:
+The fixture was run from the public source at that time:
 
 ```text
 python scripts/benchmark_desktop.py --seconds 10 --output work/desktop-performance.json
@@ -45,7 +47,7 @@ On October 11, 2026, a controlled Windows comparison against commit `38ce6b1` in
 | Visible CPU, one core | 0.52% | 0.52% |
 | GUI token refreshes while hidden | 0 | 0 |
 
-The maximum delay exposes occasional stalls that the p95 percentile misses. These short samples establish responsiveness under the injected delay; they do not establish a general memory, CPU or startup improvement. Repeat using `--io-delay-ms 300` with the benchmark above. USB scans and host/status/token/log reads run off the Qt thread; only one status observation and one USB scan can be pending. Results from an earlier saved setup or tray state are discarded. Hidden windows read lightweight host status only and do not poll token sources.
+The maximum delay exposes occasional stalls that the p95 percentile misses. These short samples establish responsiveness under the injected delay; they do not establish a general memory, CPU or startup improvement. The benchmark's `--io-delay-ms 300` option reproduced the injected delay. USB scans and host/status/token/log reads run off the Qt thread; only one status observation and one USB scan can be pending. Results from an earlier saved setup or tray state are discarded. Hidden windows read lightweight host status only and do not poll token sources.
 
 Real Qt worker regressions also cover delayed USB scans, preserving a port edited during a scan, repeated refresh requests, child-process timeout/reaping, and a later successful action. Firmware preparation runs in the action worker before confirmation; writing revalidates the selection and files afterward. The flasher has a ten-minute total limit and a two-minute silent-output limit. A timeout reports a possibly incomplete write, stops the exact child process tree and waits for exit before reporting completion; retry requires the normal board/port review and FLASH confirmation.
 

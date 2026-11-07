@@ -1,18 +1,27 @@
-# Current distribution
+# v2 status
 
-rc18 ships `nova-v1.19.1-rc18-windows-x64-terminal.zip`: LimitBuddy terminal source with a
-verified private Python runtime and hash-locked dependencies for offline Windows setup.
-It replaces the graphical app and NOVA EXE distribution; double-click `Install-LimitBuddy.cmd`, then
-open a new terminal and type `limitbuddy`.
-See TERMINAL.md and RELEASE_NOTES.md. Physical approval stays disabled.
+## Current state (v1.19.1-rc25)
+
+- **Distribution:** the LimitBuddy terminal. `nova-<version>-windows-x64-terminal.zip` carries source,
+  a verified private Python runtime and hash-locked dependencies for offline Windows setup;
+  `nova-<version>-terminal-source.zip` is the source-only package. Run `Install-LimitBuddy.cmd`, open a new
+  terminal and type `limitbuddy`. The graphical app and NOVA EXE distribution were retired in rc15.
+  See [TERMINAL.md](TERMINAL.md) and [RELEASE_NOTES.md](RELEASE_NOTES.md).
+- **Companions:** NOVA, ORBIT and CLAUDE on both boards; WRAITH and GLITCH on the P4 only
+  (`src/companion_features.h`). On S3 a stored choice of WRAITH or GLITCH shows NOVA.
+- **Unchanged gates:** physical permission approval stays disabled, Bluetooth is permanently excluded,
+  and the S3 target has no physical hardware validation.
+
+Everything below is dated, version-specific evidence from rc1 to rc14. References to desktop
+executables, the Qt app, tabs and the per-user installer describe those candidates, not the current
+distribution. Newer candidates need their own evidence.
 
 ## Historical development evidence
 
-# v2 completion status — v1.19.1-rc14
+### v2 completion status at v1.19.1-rc14
 
-This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
-release gate has passed. Use the version shown by the installed app/device to distinguish it from
-older downloads. Source, PC executables and normal firmware share v1.19.1-rc14.
+That candidate continued the USB-only v2 foundation. It is not a claim that every physical/security
+release gate has passed. Source, PC executables and normal firmware shared v1.19.1-rc14.
 
 Rc14 packages the interactive terminal with full-color quota bars, original NOVA
 cell artwork, observed sessions, history trends and the shared desktop operations.

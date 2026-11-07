@@ -7,6 +7,11 @@ Choose and save the board, USB port and providers in Settings, then Start host.
 Use Overview/Device to check actual USB status and Agents to check observational links.
 No board/provider is selected automatically and setup never flashes hardware.
 
+Claude Code quota needs no extra setup if you are signed in to Claude Code on this PC. The host
+reads your 5-hour and 7-day quota about every 5 minutes using that login (details in
+[Claude Code](PROVIDERS.md#claude-code)). If the Claude card says "check login", use Claude Code
+once so it renews its login.
+
 See [provider setup](PROVIDERS.md) and [development](DEVELOPMENT.md).
 
 ## Reading the display

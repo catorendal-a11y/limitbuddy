@@ -32,7 +32,7 @@
   mutex waits. Failed UI publication reads are cancellation, not an empty-request dismissal. Local
   consent must supersede older actions and remain off at boot; no wire/config flag creates it.
 - Hardware initialization: inspect display/touch sources before changing board pins.
-- `src/dashboard.cpp`, `src/ui_nova.cpp`, `src/ui_usage_details.cpp`, `src/ui_settings.cpp`, `src/ui_notifications.cpp`: LVGL screens/interactions.
+- `src/dashboard.cpp`, `src/ui_nova.cpp`, `src/ui_usage_details.cpp`, `src/ui_settings.cpp`, `src/ui_notifications.cpp`, `src/ui_event_center.cpp`: LVGL screens/interactions.
 - `src/ui/`: state/format/history helpers, theme and generated assets.
 - `src/ui_agents.cpp`: UI-owner read-only live metadata view; never add agent state or permissions
   to quota snapshots, infer tool phases from counters or move navigation controls with incoming data.
@@ -88,9 +88,12 @@
 - `tools/terminal_presentation.py`: reference dashboard tables and NOVA presentation. Keep recorded quota age, unknown values and stale-event states truthful. Extra provider rows must remain scrollable; device-sync age is separate from last-observed hardware age.
 - Tests use synthetic configuration without provider requests or hardware writes.
 - `scripts/build_terminal_release.py`: reviewed source/notice and firmware ZIP; never bundle NOVA application EXEs, Qt or private runtime data. The normal Windows ZIP may vendor the hash-pinned official Python runtime and pinned dependencies under `runtime/`.
-- `assets/nova/`, `assets/orbit/`, `assets/claude/`: companion SVGs (NOVA/ORBIT original, CLAUDE a
-  Claude Code banner pixel rendition, see its SOURCES.md) and logo attribution; generated transparent
-  RGB565+A8 frames. Built-in companion order is app_settings::Companion (nova, orbit, claude).
+- `assets/nova/`, `orbit/`, `claude/`, `wraith/`, `glitch/`: companion SVGs (all original except CLAUDE, a
+  Claude Code banner pixel rendition; see `assets/claude/SOURCES.md`; NOVA also holds provider logo
+  attribution) and generated transparent RGB565+A8 frames. Built-in companion order is
+  app_settings::Companion (nova, orbit, claude, wraith, glitch). WRAITH and GLITCH are compiled only
+  where `src/companion_features.h` allows (P4); on S3 a stored choice of them is NOVA.
+  `assets/terminal/` and `assets/desktop/` are terminal/legacy desktop art, not companions.
 - `src/ui/theme.h`: four runtime palettes, applied to registered screens and overlays on the UI task.
 - `tests/`: synthetic Python/protocol/settings/native UI regressions.
 

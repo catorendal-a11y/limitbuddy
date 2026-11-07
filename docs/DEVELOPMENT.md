@@ -6,13 +6,13 @@ The older architectural notes below include historical desktop details and are n
 
 # Developer guide
 
-A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4** and an experimental **original Waveshare ESP32-S3-Touch-LCD-4.3** target. [Board compatibility](BOARDS.md). A Python companion reads Codex and optional Z.AI coding-plan usage; the firmware displays it without storing cloud credentials.
+A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4** and an experimental **original Waveshare ESP32-S3-Touch-LCD-4.3** target. [Board compatibility](BOARDS.md). A Python host reads quota and local activity for the selected providers (see [providers](PROVIDERS.md)); the firmware displays it without storing cloud credentials.
 
-The current development candidate is shown by `FW_VERSION` in `src/config.h`; see [v2 status](V2_STATUS.md) for validation boundaries. The interface, code comments and documentation are in English.
+The current development candidate is shown by `FW_VERSION` in `src/config.h`; see [v2 status](V2_STATUS.md) for validation boundaries; `tools/project_version.py` reads the same value. The interface, code comments and documentation are in English.
 
 ## Features
 
-- NOVA, an animated robot with working, ready, celebration, low-quota, resting and connection states.
+- Five animated companions (NOVA, ORBIT, CLAUDE, WRAITH, GLITCH; WRAITH and GLITCH on the P4 only) with working, ready, celebration, low-quota, resting and connection states.
 - Dashboard, provider details, reset countdowns and manual refresh.
 - Session-local history with data gaps, time labels and 1 / 6 / 24-hour views.
 - Configurable quota warnings, critical alerts and dismiss/rearm behavior.
@@ -92,9 +92,9 @@ Codex quota is read through the official CLI's account RPC when the CLI is avail
 
 No credentials are needed to build or test. Local configuration, auth files, environment files, databases, logs and build output are excluded by `.gitignore`. Never put real credentials in examples, issue reports or screenshots. Provider endpoints and local database schemas can change; unsupported responses produce an error instead of invented values. This is an independent project, not an official integration.
 
-## What NOVA measures
+## What the companion measures
 
-NOVA follows **increases in local numeric token counters**, independently of keyboard, mouse and touchscreen activity:
+The companion (NOVA by default) follows **increases in local numeric token counters**, independently of keyboard, mouse and touchscreen activity:
 
 - Codex: `threads.tokens_used` in `~/.codex/state_5.sqlite`.
 - ZCode: `model_usage.computed_total_tokens` in `~/.zcode/cli/db/db.sqlite`.

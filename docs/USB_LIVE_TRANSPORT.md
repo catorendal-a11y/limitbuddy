@@ -7,7 +7,7 @@ are historical hardware evidence, not a product dependency or a reason to initia
 ## Boundaries
 
 The existing PC host remains the sole serial owner. Quota/activity snapshots continue over AIM1.
-A new, capability-negotiated, versioned live-event domain will share that connection without adding
+A separate, capability-negotiated, versioned live-event domain shares that connection without adding
 permissions or generic agent state to `aim::Snapshot`. Provider adapters, live state, companion
 rendering, transport and hardware diagnostics remain separate modules.
 
@@ -16,6 +16,8 @@ metadata stays unknown. Numeric token increases do not identify editing, testing
 Existing observational Claude Code hooks do not authorize or execute provider tools.
 
 ## Incremental integration
+
+The plan below is the order in which the live domain was built; steps 1-3 are implemented as described in the next section, and physical validation (step 4) is still pending.
 
 1. Define and test bounded live metadata, provider/session identity and event lifecycle independently
    of serial, UI and provider credentials. Do not retain transcripts, commands or tool hints in history.
@@ -28,7 +30,7 @@ Existing observational Claude Code hooks do not authorize or execute provider to
 
 ## Implemented read-only wire foundation
 
-`get_info` advertises `liveProtocol:1` and `livePermissions:false`. Old firmware is never sent live
+`get_info` advertises `liveProtocol:1`, `liveMetadata:2`, `liveSummary:1` and `livePermissions:false`. Old firmware is never sent live
 commands. The existing serial owner sends ordinary bounded JSON command lines, interleaved with AIM1;
 there is no second serial connection. The following commands have exact allowlisted fields:
 
@@ -41,9 +43,9 @@ there is no second serial connection. The following commands have exact allowlis
 Open returns a device-issued epoch and zero sequence. `live_reply` includes type, schema, cmd, ok,
 bootId, epoch, sequence, permissions (always false) and requestId (zero for state/close).
 The examples use synthetic IDs; producers must use opaque session identifiers, never paths or text.
-Maximum eight agents, known provider keys, unique provider/ID pairs, ASCII identifier length 1–64,
+Maximum eight agents, known provider keys, unique provider/ID pairs, identifiers of 1-64 characters from `A-Z a-z 0-9 _ -`,
 and fixed state names: UNKNOWN, IDLE, THINKING, EDITING, SEARCHING, BUILDING, TESTING, WAITING,
-FAILED and DONE. UNKNOWN/IDLE preserve honest incomplete data instead of inventing task activity.
+FAILED and DONE (capability 2 below adds more). UNKNOWN/IDLE preserve honest incomplete data instead of inventing task activity.
 No tool hints, transcript, provider command or permission fields are accepted.
 
 ### Summary and session names (`liveSummary:1`)
@@ -53,10 +55,12 @@ Firmware that also advertises `liveSummary:1` accepts three optional top-level f
 listed), `selectedMask` and `linkedMask` (bit per provider in catalog order: providers the user
 selected, and providers whose lifecycle events are linked). They let the Agents screen say "8 of 11"
 and explain an empty list ("Not linked: CODEX, CLAUDE") instead of showing nothing. Each row may
-carry `label` (1-15 ASCII letters, digits, space, dash) and `hue` (0-11), a name and colour derived
+carry `label` (1-15 ASCII letters with single spaces between words) and `hue` (0-11), a name and colour derived
 from the opaque id by `tools/session_identity.py`, so the device and the PC terminal show the same
 "Jolly Beaver" for the same session. A name is a recognition aid, not an identity; it carries no
 content. Hosts send these fields only when `get_info` advertises `liveSummary:1`.
+
+### Session semantics
 
 State is a complete replacement, including an empty list. Sequence must strictly increase;
 duplicate/older sequences cannot renew freshness. Incorrect boot/epoch traffic is rejected without
@@ -69,37 +73,37 @@ rather than wrapping identifiers. New open resets sequence; old epochs are never
 value copies through `live_agent::read_usb()`. It does not add fields to `aim::Snapshot` or renew the
 quota host lease. `tools/usb_live.py` uses the existing Panel owner and verifies correlated replies;
 ambiguous delivery invalidates its session without retry. Regular host polling now uses the client
-only for capability-advertising firmware. Provider adapters are opt-in Codex/Claude lifecycle observers;
+only for capability-advertising firmware. Provider adapters are opt-in Codex/Claude/ZCode lifecycle observers (see [live provider events](LIVE_PROVIDER_EVENTS.md));
 the [live agent screen](LIVE_AGENT_VIEW.md) reads synchronized copies on the UI task. Physical
 integration remains pending. Old firmware keeps its normal quota/activity behavior.
 
 Synthetic Python and strict native C++ tests cover metadata, correlation, stale epochs/sequences,
 expiry, clock rollover and coexistence with normal info/quota protocol state. They do not establish
 physical USB performance or provider compatibility. Measure serial latency, queue pressure and quota
-coexistence before choosing production scheduling. No host trust mechanism is implemented yet.
+coexistence before choosing production scheduling. The live domain carries no trust: the separate enrollment and authenticated-session work is described in [USB_INTERACTION_AUTH.md](USB_INTERACTION_AUTH.md) and is not used by live state.
 
 ## Permission integration gate
 
-The native permission controller/dialog remain a disabled prototype. A USB cable establishes neither
+The native permission controller/dialog are not enabled in production (see [PERMISSION_UI.md](PERMISSION_UI.md)). A USB cable establishes neither
 provider authorization nor authenticated host identity. Never hardcode `secure=true` for USB.
 Approval requires an independently verified host session, explicit local opt-in, a documented provider
 decision interface, the exact current prompt, complete visible details and a continuous physical hold.
 Reconnect, stale data or ambiguous delivery must fail closed without replay.
 
-Preferred future path: Claude Code PermissionRequest -> dedicated AI-Monitor-Permission helper ->
+Intended path (developer builds only, not enabled in production): Claude Code PermissionRequest -> dedicated AI-Monitor-Permission helper (`tools/aim_permission.py`) ->
 same-user local IPC -> validated host -> USB -> existing physical permission UI -> one response along
 the same route. AI-Monitor-Events remains observational. No network listener, arbitrary file requests,
 shell execution, prompt persistence or configuration changes during helper operation.
 Unavailable/expired requests use normal provider permission handling when the documented hook
 contract allows it; never automatic allow. Generic interaction types replace the legacy live-snapshot
-dependency. Host/device/nonce/revision, freshness, opt-in, visibility and final single-use commit must
-all be checked. See phase 7 in [the updated plan](../plans/COMPANION_V2.md).
+dependency (done). Host/device/nonce/revision, freshness, opt-in, visibility and final single-use commit must
+all be checked. Status: [USB_PERMISSION_HELPER.md](USB_PERMISSION_HELPER.md); plan: phase 7 in [COMPANION_V2.md](../plans/COMPANION_V2.md).
 
 Reference: [Claude Code PermissionRequest contract](https://code.claude.com/docs/en/hooks#permissionrequest).
 
 ### Read-only metadata capability 2
 
-`liveMetadata: 2` adds generic agent state names and optional `elapsedSeconds` (0..604800) and
+`liveMetadata: 2` adds generic agent state names (WORKING, READING, WRITING, RUNNING, NEEDS_ATTENTION, ERROR, COMPLETED) and optional `elapsedSeconds` (0..604800) and
 `observedAgeSeconds` (0..900) per entry. Unknown fields, booleans and out-of-bounds values reject
 the whole snapshot. Legacy three-field entries and FAILED/DONE aliases still work. The host
 downgrades entries for panels without the capability. Permissions remain disabled.

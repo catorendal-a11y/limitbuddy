@@ -5,7 +5,7 @@ The distribution contains Python source and board firmware, without a NOVA appli
 
 ## Install on Windows
 
-1. Download `nova-v1.19.1-rc18-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases).
+1. Download `nova-v1.19.1-rc25-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25).
 2. Extract it into a permanent writable folder. Keep that folder after installation.
 3. Double-click **Install-LimitBuddy.cmd**. It verifies the included runtime and registers only this user's `limitbuddy` command. No administrator access is needed.
 4. Open a new terminal, from any folder, and type:
@@ -45,11 +45,11 @@ R reload local metadata, ? help, Escape cancel forms, Q quit. Source launcher:
 `AI-Monitor-Terminal.bat`. `AI-Monitor.bat` is a compatibility alias for the same terminal.
 
 Quota, observed sessions and USB connection are separate signals. Unknown quota remains
-unknown. Claude may report activity only. Stale agent events show Last rather than current
+unknown. Claude quota comes from your local Claude Code login or the optional statusline bridge, otherwise Claude shows activity only. Stale agent events show Last rather than current
 work. Opening and refreshing the dashboard never starts a model request or a second USB owner.
 Invalid settings stay in the form. Secret fields are masked and unchanged keys are preserved.
 
-Firmware / Update writes only the application partition after exact board identification and
+Device / Firmware with **Application update** writes only the application partition after exact board identification and
 confirmation. First installation resets display settings. Source-only Git downloads contain
 no firmware: use the terminal release ZIP with both images, or build and collect them as
 explained in DEVELOPMENT.md. Physical permissions remain disabled; S3 is experimental.

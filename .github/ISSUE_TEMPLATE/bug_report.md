@@ -17,7 +17,7 @@ What happened, and what did you expect?
 
 ## Environment
 
-- Firmware version:
+- Firmware version and `limitbuddy --version`:
 - Board/display:
 - Operating system / Python:
 - Provider / CLI version:

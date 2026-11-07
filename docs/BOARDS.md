@@ -9,12 +9,12 @@ One repository and one Windows x64 terminal package contain two separate firmwar
 
 The S3 build targets the **original CH422G board with 16 MB flash and 8 MB OPI PSRAM**. It does not support the B, C or other similarly named variants. Verify the model on the board and its manufacturer's documentation before installing.
 
-Both builds use LVGL 9.6 and the same dashboard, provider choices, NOVA/ORBIT artwork, themes, warnings and saved settings. They have independent display drivers and firmware identities. NOVA chooses the corresponding image and esptool chip, verifies file sizes, SHA-256, image chip headers and factory/application consistency, and checks the board identity during the host handshake. USB vendor IDs identify candidate ports only; they are not proof of a board's identity. Select an explicit port when several candidates appear.
+Both builds use LVGL 9.6 and the same dashboard, provider choices, themes, warnings and saved settings. The P4 build has five companions; the S3 build has NOVA, ORBIT and CLAUDE only (WRAITH and GLITCH need more flash). They have independent display drivers and firmware identities. NOVA chooses the corresponding image and esptool chip, verifies file sizes, SHA-256, image chip headers and factory/application consistency, and checks the board identity during the host handshake. USB vendor IDs identify candidate ports only; they are not proof of a board's identity. Select an explicit port when several candidates appear.
 
 ## Waveshare S3 setup
 
 1. Connect a data cable to **USB TO UART**. Use this connector for both firmware installation and everyday host operation. The board's native USB connector is not the LimitBuddy transport in this build.
-2. Open **Settings > Edit settings**, choose **Waveshare ESP32-S3 4.3" (experimental)**, select your AI providers and the UART COM port, then save. Install the manufacturer's CH343 driver if Windows does not list the bridge.
+2. Open **Settings > Edit settings**, choose **Waveshare ESP32-S3-Touch-LCD-4.3**, select your AI providers and the UART COM port, then save. Install the manufacturer's CH343 driver if Windows does not list the bridge.
 3. Open **Device > Firmware** and check the selected board again. Use **First installation / factory image** when replacing the manufacturer's demo or another project's firmware. Type `FLASH` only after checking the board and port.
 4. Open **Settings > Start host** after installation. If normal flashing cannot connect, follow Waveshare's BOOT/RESET recovery instructions for this exact model. Stop the host and close serial monitors before flashing.
 

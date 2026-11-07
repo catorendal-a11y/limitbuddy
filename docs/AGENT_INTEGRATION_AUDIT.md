@@ -2,7 +2,7 @@
 
 Date: 2026-10-15. Installed application and P4 firmware: v1.19.1-rc2.
 
-This records the **rc2 baseline**, before the rc3 repairs. Rc3 adds ZCode hooks,
+This records the **rc2 baseline**, before the rc3 repairs; the current release is v1.19.1-rc25, so every finding below is historical. Rc3 adds ZCode hooks,
 an independent live reader, setup-definition checks, legacy Codex wrapper migration
 and visible USB delivery health. See RELEASE_NOTES.md. Baseline observations below
 are retained as evidence and must not be presented as the current implementation.
@@ -59,7 +59,9 @@ verify a real Claude session, subscription quota or physical lifecycle display.
 Activation remains explicit. Tool authorization remains a separate disabled domain.
 See the [Claude Code hook reference](https://code.claude.com/docs/en/hooks).
 
-## ZCode: a supported source exists, but the adapter is missing
+## ZCode: a supported source exists, but the adapter is missing (fixed in rc3)
+
+Baseline finding, now superseded: `live_events.SOURCES` includes ZCode and `--link-events zcode` exists. The text below is the original rationale.
 
 The [official ZCode hook documentation](https://zcode.z.ai/en/docs/hooks) describes
 SessionStart, UserPromptSubmit, PreToolUse, PermissionRequest, PostToolUse,

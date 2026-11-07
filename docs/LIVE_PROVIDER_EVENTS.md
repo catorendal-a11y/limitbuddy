@@ -22,7 +22,7 @@ must be reviewed/trusted in Codex's hook browser (CLI `/hooks`) before it runs; 
 require review again. Do not bypass hook trust. Restart the session after linking. Installed-client
 compatibility and genuine hook delivery remain validation gates; a saved link is not proof of delivery.
 
-Claude Code uses its existing explicit observational hook setup. These hooks never return an approval,
+Claude Code uses its existing explicit observational hook setup (`--claude-event` is the hook command; `--link-events claude` installs it). These hooks never return an approval,
 denial, rewritten input, model context or continuation instruction. The Codex shell wrapper returns
 only neutral `{}` JSON, including on observer failure, because Stop/SubagentStop expect JSON output.
 The helper itself emits no content. There are no provider API calls or new model turns.
@@ -91,7 +91,7 @@ Firmware advertises `liveMetadata: 2`. The host sends optional elapsed/last-obse
 to that capability, and downgrades state names plus removes timing for older firmware. USB/AIM1
 quota messages, permission authority and source records stay separate.
 
-## Local Codex diagnostic checkpoint
+## Local Codex diagnostic checkpoint (historical, October 2026)
 
 The installed official client's read-only `hooks/list` RPC reported all ten current user hooks
 trusted and enabled, without warnings. The observer's neutral no-op wrapper completed in 250 ms.

@@ -1,6 +1,6 @@
 # Provider expansion plan
 
-Status: implementation plan, not a claim that bridge-only providers work automatically. Baseline: v1.12.0, eight selectable tools, no first-run provider defaults, automatic local activity for Codex/ZCode/Claude Code/Gemini CLI, optional Claude quota bridge, and external numeric bridges for the remaining choices.
+Status: implementation plan, not a claim that bridge-only providers work automatically. Original baseline: v1.12.0. Current: v1.19.1-rc25, eight selectable tools, no first-run provider defaults, automatic local activity for Codex/ZCode/Claude Code/Gemini CLI/OpenCode, Claude quota from the documented statusline bridge with an undocumented OAuth usage fallback, opt-in lifecycle events for Codex/Claude Code/ZCode, and external numeric bridges for Copilot, Cursor and Antigravity.
 
 Start a new coding task with `AGENTS.md`, `docs/PROVIDERS.md`, this plan and the relevant step. Run the Python suite for host changes; build firmware and run `scripts/run_tests.py --ui` for firmware/UI work. Every step should fit one reviewable PR. Do not implement every provider in one change.
 
@@ -9,15 +9,15 @@ Start a new coding task with `AGENTS.md`, `docs/PROVIDERS.md`, this plan and the
 - Follow the existing registry/config/polling/frame patterns in `tools/provider_catalog.py`, `tools/aim_host.py`, `tools/token_activity.py`, `tools/local_activity.py` and `tools/telemetry_bridge.py`.
 - Preserve explicit selections. An unselected provider must not be polled or scanned. Missing credentials must not silently enable another tool.
 - Report capability and actual availability separately. Context occupancy, billing estimates, request counts and plan quota percentages are distinct metrics.
-- Use documented interfaces or reviewed local formats. Never scrape browser cookies, decrypt app credentials or infer a personal quota from an organization report.
+- Use documented interfaces or reviewed local formats. Never scrape browser cookies, decrypt app credentials or infer a personal quota from an organization report. The one approved exception is Claude's undocumented `GET https://api.anthropic.com/api/oauth/usage` fallback (see Step 3): it uses the existing Claude Code login token inside the quota worker only, is allowlisted in `tools/host_security.py` and must be treated as breakable.
 - Fixtures must be synthetic and record sizes bounded. Keep prompts, authentication files, session transcripts, logs and raw identifiers out of commits/releases. Persist only whitelisted numeric bridge data or explicitly opted-in fixed lifecycle states/timestamps with hashed IDs.
 - Test first-sample baselines, repeated IDs, streaming updates, counter decreases, corrupt/partial records, staleness, reconnects, permission failure and a source that is missing entirely.
 - Firmware currently has eight source bits, eight views and three quota rows per view. A ninth provider is blocked on a versioned protocol-capacity change; do not reuse another source bit.
-- Preserve provider branding, quota warning meanings, theme/companion settings and the current RGB565+A8 asset strategy. v1.12.0 uses about 85% of the application partition; measure added firmware assets before accepting them.
+- Preserve provider branding, quota warning meanings, theme/companion settings and the current RGB565+A8 asset strategy. v1.12.0 used about 85% of the application partition; re-measure the current figure and any added firmware assets before accepting them.
 
 ## Step 1 - Harden automatic onboarding (current Codex baseline)
 
-Implemented in this task: selected-Codex setup locates or installs the official CLI, offers user-mediated login, respects CODEX_HOME and reads plan quota via account/rateLimits/read. It reuses the CLI credential store and keeps the legacy file adapter only when no CLI is available. It never starts a model turn or copies credentials into monitor configuration.
+Implemented: selected-Codex setup locates or installs the official CLI, offers user-mediated login, respects CODEX_HOME and reads plan quota via account/rateLimits/read. It reuses the CLI credential store and keeps the legacy file adapter only when no CLI is available. It never starts a model turn or copies credentials into monitor configuration.
 
 Remaining work for one follow-up PR: test installed-client version/OS coverage with consenting testers, make update/retry/cancellation statuses uniform, exercise keyring/file auth and API-key-only quota failure, and show capability/readiness without revealing account details. Keep installer/sign-in as explicit user actions. Rollback: disable the onboarding action while preserving source selections, the CLI account path and legacy fallback.
 
@@ -39,13 +39,13 @@ Dependency: none. Priority: before adding more automatic bridges.
 
 ## Step 3 - Claude and Gemini onboarding robustness
 
-Context: local activity already works from bounded CLI log parsing. Claude quota comes from documented statusline rate-limit fields; an existing custom statusline is preserved. Gemini has local usage/telemetry, but this release has no automatic account-quota adapter.
+Context: local activity already works from bounded CLI log parsing. Claude quota has two sources. The documented statusline bridge (`tools/activity/claude-quota.json`, fresh for five minutes) takes priority, but Claude Code desktop does not run the statusline command and `rate_limits` has been missing from the statusline payload since Claude Code CLI 2.1.138, also on Max plans. The host therefore falls back to the undocumented `GET https://api.anthropic.com/api/oauth/usage` (header `anthropic-beta: oauth-2025-04-20`) with the local OAuth token from `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR` honored; see `fetch_claude` and `claude_quota` in `tools/aim_host.py`). The token is read only in the quota worker, never logged, stored or passed in arguments; requests are cached for five minutes and 401/429 back off via `ProviderRetries`; `five_hour` maps to Session/300 min and `seven_day` to Week/10080 min. A missing credentials file keeps local token activity. This is an approved exception to the documented-sources-only policy. An existing custom statusline is preserved. Gemini has local usage/telemetry, but this release has no automatic account-quota adapter.
 
 Files: `tools/local_activity.py`, `tools/telemetry_bridge.py`, `tools/aim_control.py`, corresponding tests and documentation.
 
-Tasks: add selected-provider source discovery checks and version-specific fixture coverage; make optional Claude bridge install/remove idempotent, with rollback to its backup and no replacement of custom hooks; evaluate Gemini's documented hooks/OpenTelemetry as an opt-in numeric bridge. Do not modify the user's CLI settings except through a reviewed, explicit setup action.
+Tasks: add selected-provider source discovery checks and version-specific fixture coverage; monitor the undocumented OAuth endpoint for schema or policy changes and keep the fail-closed activity-only fallback; make optional Claude bridge install/remove idempotent, with rollback to its backup and no replacement of custom hooks; evaluate Gemini's documented hooks/OpenTelemetry as an opt-in numeric bridge. Do not modify the user's CLI settings except through a reviewed, explicit setup action.
 
-Validation: incomplete JSONL, log rewrite/truncation, repeated IDs, excluded subagent duplication, Unicode paths, permission errors, install/remove round trip, and bridge output containing no prompt/credential text. Treat reported usage as observed activity rather than exact billing.
+Validation: OAuth reply with missing/invalid windows, 401/429 backoff and a token-free log, incomplete JSONL, log rewrite/truncation, repeated IDs, excluded subagent duplication, Unicode paths, permission errors, install/remove round trip, and bridge output containing no prompt/credential text. Treat reported usage as observed activity rather than exact billing.
 
 Exit: a beginner can see why a selected source is unavailable and enable the optional bridge safely. Rollback: restore backed-up app settings and retain current local activity parsing.
 
@@ -69,7 +69,7 @@ Dependency: Step 2.
 
 Scope update, 2026-10-10: the user requested setup from the app. Official OpenCode V1/V2 SQLite projections and normalized cache/reasoning semantics were verified. A bounded read-only numeric adapter now covers those schemas, with hashed IDs, imported-session baselines and synthetic tests. Unsupported schemas stay unavailable; remaining account quota is not supported. The SDK bridge remains a possible extension. See PROVIDERS.md for primary references.
 
-Files: `integrations/opencode/`, existing bridge/capability modules, fixtures and provider documentation.
+Files: `tools/opencode_activity.py` (implemented adapter), existing bridge/capability modules, fixtures and provider documentation. A future SDK bridge would go in a new `integrations/opencode/` directory.
 
 Tasks: research the official SDK's usage events/metrics; create a small numeric-only bridge with supported-version detection; preserve session identity and deduplicate updates. Avoid parsing arbitrary chat databases until the local schema and access scope are verified.
 
@@ -103,7 +103,7 @@ Dependency: Step 2. Research can run independently; implementations require revi
 
 ## Ordering and changes to the plan
 
-Recommended order: Step 1, Step 2, then separate Claude/Gemini and Copilot PRs, followed by OpenCode and the Cursor/Antigravity decisions. Steps 3-6 share registry/bridge files; do not merge conflicting edits without a rebase and regression run. This task writes the plan; it does not implement those future provider expansions.
+Recommended order: Step 1, Step 2, then separate Claude/Gemini and Copilot PRs, followed by OpenCode and the Cursor/Antigravity decisions. Steps 3-6 share registry/bridge files; do not merge conflicting edits without a rebase and regression run. This document is a plan; it does not implement those future provider expansions.
 
 To change scope, record the reason and evidence, update dependencies and acceptance criteria, and keep unfinished work explicitly planned/blocked rather than calling it supported. Any future provider beyond the current eight needs a separate protocol-capacity PR before registration.
 

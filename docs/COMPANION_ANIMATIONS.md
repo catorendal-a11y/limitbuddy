@@ -1,7 +1,7 @@
 # Companion animation format 2
 
-NOVA and ORBIT now use the same allocation-free animation player above CompanionRenderer and
-the verified P4 LZ4 cache. Working/attention/success/error sequences select multiple existing poses;
+All built-in companions share one allocation-free animation player above CompanionRenderer and
+the verified P4 LZ4 cache (sequences in `src/companions/builtin_animation.h`). Working/attention/success/error sequences select multiple existing poses;
 resting/warning/critical remain stable poses. Each mood has its own timing and loop policy. Success
 is nonlooping and holds its final frame. Changing companion or mood restarts the appropriate clip.
 Testing animation is selected only from a fresh explicit TESTING event for a selected provider.
@@ -37,7 +37,7 @@ cache pins/hash verification and raw fallback remain in the existing renderer/ca
 
 ## External packs on P4
 
-Open the desktop **Companions** tab and choose **Import and use pack**. The ZIP must contain
+In the NOVA terminal open **4 Device > Companion packs** and choose **Import and use pack** (type `IMPORT` to confirm). The ZIP must contain
 `manifest.json` and exactly its declared frame files, with optional `LICENSE` and `README.md`.
 Archives are never extracted or executed. Duplicate members/fields, unsafe names, unknown files,
 oversize data, invalid crops, timings, hashes or compressed blocks are rejected before selection.
@@ -69,6 +69,6 @@ Original example packs can be exported reproducibly with:
 python scripts/build_companion_packages.py --output work/companion-packs
 ```
 
-This uses the committed original NOVA/ORBIT pixels and animation timings, pinned LZ4 block
+This exports only NOVA and ORBIT (`--output` is the only option), using the committed original pixels and animation timings, pinned LZ4 block
 compression, exact hashes and the unchanged original MIT notice. It does not copy provider logos
 or grant trademark rights. Source/native tests are distinct from physical rendering evidence.

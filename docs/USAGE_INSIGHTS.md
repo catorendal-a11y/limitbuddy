@@ -14,7 +14,7 @@ and, with compatible firmware, whether the display acknowledged that activity so
 alone does not prove token delivery. If the first record establishes its baseline, perform another
 normal turn to test an increase. Provider instructions remain visible on the Agents page.
 
-Codex uses the official client/account setup. ZCode quota requires your own Z.AI Coding Plan key.
+Codex uses the official client/account setup. Claude Code quota comes from the optional statusline bridge or, when that is absent or stale, from the undocumented OAuth usage fallback described in [Providers](PROVIDERS.md#claude-code). ZCode quota requires your own Z.AI Coding Plan key.
 Gemini and OpenCode report local activity without remaining account quota. Copilot, Cursor and
 Antigravity require an external numeric bridge. These limitations remain visible in the checklist.
 
@@ -44,7 +44,7 @@ Storage/queue failures are reported; the app never replaces an unfamiliar databa
 Save Claude Code as a selected provider. Open **Agents > Provider events**, choose Claude Code,
 leave Remove off, review the confirmation and type `LINK`, then restart Claude Code.
 This explicitly adds observational command hooks while preserving other hooks and custom statuslines.
-It is separate from **Link Claude quota**, which handles subscription windows.
+It is separate from **Link Claude quota**, which only installs the statusline quota bridge (subscription windows).
 
 The terminal and updated display can show **Working**, **Needs you**, **Turn complete** and
 **Session error** from documented Claude events. NOVA and ORBIT both use these states.

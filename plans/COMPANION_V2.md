@@ -1,5 +1,10 @@
 # LimitBuddy v2: physical AI agent companion and monitor
 
+Planning document written during the v2 work. Phase checkpoints describe the state when written; for current
+status see [V2_STATUS](../docs/V2_STATUS.md) and [RELEASE_NOTES](../docs/RELEASE_NOTES.md). Rules in the
+invariants and phase text still apply. The graphical desktop app and EXE helpers mentioned in older checkpoints
+were retired in rc15 (terminal distribution).
+
 The user's updated repository review supersedes the earlier construction order. Inspect current
 main and the working tree before changes; preserve existing verified work and the mature USB/AIM1
 system. Keep English code, UI and documentation. Push/release readiness is not established by
@@ -29,10 +34,9 @@ Every major new subsystem gets synthetic/native tests before physical integratio
 
 USB/AIM1, quota/token tracking and PC history already exist. Claude observational hooks exist;
 the new local Codex/Claude lifecycle adapters, read-only USB metadata channel and agent/provider
-screen have synthetic/native validation. The correct LimitBuddy Windows app is now locally rebuilt;
-real client compatibility remains a separate gate. Provider-status rows are not fabricated agents.
+screen have synthetic/native validation. Real client compatibility remains a separate gate. Provider-status rows are not fabricated agents.
 
-NOVA/ORBIT union-alpha cropping saved 23.8%. P4 physically validated LZ4 across twelve poses
+NOVA/ORBIT union-alpha cropping saved 23.8%. P4 physically validated LZ4 across twelve NOVA/ORBIT poses
 (about 520 KB encoded payload), verified PSRAM cache allocation/decode/hash behavior and physically
 benchmarked PPA rotation. The generic renderer and cache ownership/fallback foundation exist.
 Do not repeat codec research. Built-ins remain safe fallback.
@@ -64,7 +68,7 @@ compatibility before updating UI consumers. Preserve quota/token functionality t
 
 ## Phase 3: production LZ4 companions
 
-Move normal NOVA/ORBIT rendering toward verified compressed LZ4 assets, PSRAM cache,
+Move normal built-in companion rendering toward verified compressed LZ4 assets, PSRAM cache,
 CompanionRenderer and LVGL. Retain a safe built-in fallback chain; allocate bounded pools at boot
 and respect image lifetime/fencing. Measure actual built firmware/app size, free application space,
 boot time, PSRAM/internal heap and largest blocks, frame-switch latency and UI responsiveness.
@@ -118,9 +122,9 @@ and explicit PC/device setup are connected. Physical enrollment validation, perm
 UI publication/final TX gates and opt-in remain required; no real approval is enabled.
 See [authentication evidence](../docs/USB_INTERACTION_AUTH.md).
 
-Claude Code PermissionRequest -> AI-Monitor-Permission -> same-user local IPC ->
+Claude Code PermissionRequest -> permission helper (`tools/aim_permission.py`) -> same-user local IPC ->
 validated LimitBuddy host -> USB -> existing permission UI -> one decision back along the same path.
-AI-Monitor-Events stays observational. Create a separate permission helper/executable and explicit
+The event observer stays observational. Keep the permission helper separate with explicit
 setup; do not give the event observer interactive authority.
 
 The helper accepts one strictly bounded request, extracts only required transient ID/tool/hint fields,
@@ -160,7 +164,7 @@ Add small graphs and a daily AI summary; unsupported values remain unavailable.
 ## Phase 9: versioned animation packs
 
 Checkpoint: bounded schema 2 and allocation-free playback are implemented in the candidate.
-Built-in NOVA/ORBIT now use multi-pose mood sequences through the existing renderer/cache.
+All built-in companions now use multi-pose mood sequences through the existing renderer/cache.
 See [animation format](../docs/COMPANION_ANIMATIONS.md). Rc6 implements bounded PC import/storage
 and verified dual-bank P4 RAM staging/activation with automatic host restoration. Interrupted
 replacement retains the old pack. Native validation and actual device evidence remain separate;
@@ -185,11 +189,10 @@ more animations/higher redraw frequency. Keep the proven CPU path meanwhile.
 P4 is JC4880P443C_I_W_Y on COM6; COM4 belongs to another project and must not be accessed.
 No physical S3 is available. Production diagnostics retain firmware/app/free partition, heap/largest
 block, PSRAM/largest block, display buffers, uptime, touch/host and future cache health.
-Preserve private settings, NVS and firmware rollback backups. Fresh executable packaging, correct
-installed-app/shortcut identity, real provider events, physical touch/USB tests, memory/latency and
+Preserve private settings, NVS and firmware rollback backups. Fresh terminal-package installation, real provider events, physical touch/USB tests, memory/latency and
 soak/fresh-PC checks are release gates. Windows signing remains unresolved; do not bypass protection.
 
-## Current next work
+## Next work at rc14 (historical)
 
 The corrected home UI is deployed on P4, and phase 2 domain separation is implemented.
 The device enrollment core now interoperates with PC enrollment using actual native crypto;

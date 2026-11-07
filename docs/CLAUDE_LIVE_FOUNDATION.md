@@ -32,7 +32,7 @@ the actual bounded prompt as well as epoch/revision; sanitization cannot collaps
 
 ## Permission state
 
-`PermissionMachine` defines NONE, RECEIVED, DISPLAYED, HOLDING, SENT, ACKNOWLEDGED, DENIED,
+`PermissionMachine` (defined in `src/interaction/permission_state.h`, aliased from `src/live_agent/permission_state.h`) defines NONE, RECEIVED, DISPLAYED, HOLDING, SENT, ACKNOWLEDGED, DENIED,
 EXPIRED, CANCELLED and ERROR. Display confirmation requires the matching epoch/revision and an
 explicit `completeDetailsVisible` assertion from the future UI. A continuous hold must last at least
 1,800 milliseconds. Early release/drag-out/touch failure must call `cancel_gesture`; navigation cancels

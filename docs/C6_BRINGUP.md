@@ -28,16 +28,17 @@ A different SDK pin configuration fails the build instead of silently using its 
 Do not apply this profile to another board revision without its wiring evidence.
 
 One worker initializes NVS without erasing it, creates the SDK event loop, starts ESP-Hosted,
-connects to its coprocessor, checks its announced target through `esp_hosted_get_cp_info`, reads
-the actual slave firmware version, then requests controller initialization/enabling through Hosted RPC.
-There is no coprocessor firmware update, credential input, bonding,
-automatic retry or connection to an access point.
+connects to its coprocessor, checks its announced target through `esp_hosted_get_cp_info` and reads
+the actual slave firmware version. It never requests Bluetooth controller initialization or enabling
+(the schema 1 experiment did; see the decision above). There is no coprocessor firmware update,
+credential input, bonding, automatic retry or connection to an access point.
 
 Send the ASCII line `probe` followed by newline over this standalone firmware's USB serial port to
-read the result. The response includes host/slave version, RPC response state, controller state,
-numeric error and deadline state. `configuredSlaveTarget` is separate from `detectedChip`, which is
-populated only after the runtime Hosted identity check. `controllerEnableConfirmed` reports the
-controller RPC acknowledgement, not an independently measured HCI/GATT connection.
+read the result. The response includes host/slave version, RPC response state, numeric error and
+deadline state. `configuredSlaveTarget` is separate from `detectedChip`, which is populated only
+after the runtime Hosted identity check. `controllerEnableConfirmed` is always `false` in schema 2;
+in schema 1 it reported the controller RPC acknowledgement, not an independently measured HCI/GATT
+connection.
 
 The supervisor marks unfinished work as timed out after 10 seconds and does not retry. A blocking
 SDK operation may remain active: the test does not forcibly delete its task or free driver resources.
@@ -48,14 +49,14 @@ Successful completion remains successful when the result is read later.
 ## Validation status and physical gate
 
 Native tests cover deadline boundaries, completed results and clock rollover. Compilation validates
-the pinned SDK APIs/pins. Neither proves actual C6 presence, compatible slave firmware, controller
-operation, pairing or secure Claude transport. Flash only the explicitly
+the pinned SDK APIs/pins. Neither proves actual C6 presence, compatible slave firmware or controller
+operation. Flash only the explicitly
 identified P4 port after stopping its host, and restore its production image afterwards. Never flash
 an unrelated serial device or update the C6 merely to probe it.
 
-Physical execution on JC4880P443C_I_W_Y completed on 2026-10-13. Runtime target detection reported
-ESP32-C6, host version 2.12.13 and coprocessor version 2.12.22. Controller initialization/enabling
-was acknowledged through RPC within the deadline. No C6 firmware was updated. The original P4
+Historical schema 1 execution on JC4880P443C_I_W_Y completed on 2026-10-13. Runtime target detection
+reported ESP32-C6, host version 2.12.13 and coprocessor version 2.12.22. Controller
+initialization/enabling was acknowledged through RPC within the deadline. No C6 firmware was updated. The original P4
 application was restored and its USB startup verified. HCI, GATT, secure pairing and Claude Desktop
 remain untested; production does not initialize this test transport.
 See [the measured results and limits](P4_HARDWARE_BENCHMARKS.md).

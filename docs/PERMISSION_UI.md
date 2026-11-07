@@ -1,7 +1,7 @@
 # Live permission UI prototype
 
 The v2 permission dialog is implemented and tested with actual native LVGL pointer input.
-It is **not initialized in production** and has no BLE adapter or real permission sender.
+It is **not initialized in production firmware** and has no production permission sender; Bluetooth is permanently excluded.
 USB/AIM1 quota monitoring, provider setup and companion rendering remain separate.
 
 ![Native synthetic permission dialog during a hold](images/permission-native-prototype.png)
@@ -56,7 +56,7 @@ acknowledgement source; the current prototype never invents one.
 
 The pure controller tests cover incomplete display, interrupted holds, final prompt/epoch/security
 checks, expiry, one-time queue/commit consumption and cancellation after queue handoff.
-Native P4/S3 identity tests cover 22 pointer/visibility scenarios: valid hold, denial, short tap,
+Native P4/S3 identity tests cover pointer/visibility scenarios: valid hold, denial, short tap,
 touch failure, drag-out, changed IDs/details, disconnect, expiry, unsupported/long text, demo,
 sleep/opt-out, popup/system overlays, navigation, hidden/faded/clipped details and altered visible
 text and closing after queue handoff. They also verify fixed controls and that view recreation
@@ -69,12 +69,12 @@ interface, explicit local opt-in, synchronized publication, bounded TX/RX and ph
 tests. USB attachment alone cannot assert security. See [USB-only integration](USB_LIVE_TRANSPORT.md).
 The default remains no live permission transmission.
 
-The updated production plan uses a separate AI-Monitor-Permission helper for Claude Code's
-PermissionRequest hook, same-user local IPC and the existing USB host. AI-Monitor-Events must never
-gain permission authority. Generic interaction/request/decision types and trustedChannel context
+The production plan uses a separate permission helper (`tools/aim_permission.py`) for Claude Code's
+PermissionRequest hook, same-user local IPC and the existing USB host. The observational events hook must never
+gain permission authority. Generic interaction/request/decision types and `trustedChannel` context
 now replace the prototype's ClaudeLiveSnapshot/security dependency in the permission UI.
 Keep every tested physical hold, cancellation, visibility and single-use final commit check.
 The separate helper, same-user IPC and host broker/service have synthetic tests, including actual
-local Windows pipe roundtrips. Authenticated USB integration and explicit opt-in setup remain
-pending; the host does not start the service. See [implementation status](USB_PERMISSION_HELPER.md)
-and [phase 7](../plans/COMPANION_V2.md).
+local Windows pipe roundtrips. The authenticated USB foundation ([USB_INTERACTION_AUTH.md](USB_INTERACTION_AUTH.md)) and a developer-only
+device runtime exist, but production approvals stay disabled and the host does not start the service. See
+[implementation status](USB_PERMISSION_HELPER.md) and [phase 7](../plans/COMPANION_V2.md).

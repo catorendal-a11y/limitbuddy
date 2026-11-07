@@ -1,7 +1,7 @@
 # Authenticated USB interaction foundation
 
 Enrollment is connected to explicit PC/device setup; **production permission control is disabled**.
-The generic permission dialog remains dormant. No enrolled key, interactive Claude hook or real
+The generic permission dialog is not initialized in production firmware. No enrolled key, interactive Claude hook or real
 tool approval was created by these tests. Normal USB/AIM1 quota monitoring remains independent.
 
 ## Enrollment and stored authority
@@ -13,8 +13,8 @@ The PC must explicitly confirm that comparison; it cannot create a TrustRecord u
 returns the matching enrollment proof. The device gates that proof on a physical continuous hold
 and successful device-side persistence. Physical end-to-end validation remains pending.
 
-`tools/interaction_trust.py` stores only an encrypted record with Windows current-user DPAPI and
-installation-specific entropy. There is no plaintext key in the file. Wrong-user/installation,
+`tools/interaction_trust.py` stores only an encrypted record (`tools/permission-trust.json`) with Windows
+current-user DPAPI and 32-byte entropy derived from the installation path. There is no plaintext key in the file. Wrong-user/installation,
 invalid records, symlinks and default all-zero keys fail closed. Writes are atomic. These files
 are excluded from Git and rejected by release export. There is no network listener or cloud account.
 
@@ -47,8 +47,8 @@ the authenticated request/decision path to the dedicated same-user IPC service. 
 expiry are rechecked before resolving the helper. An unavailable/corrupt/expired channel cancels
 the request and retains the normal Claude permission fallback. No ambiguous decision is retried.
 
-ProtoCore has optional command/tick extension points. No interaction state is added to aim::Snapshot.
-Without the production adapter, get_info reports interactionProtocol 0 and interaction commands
+ProtoCore has optional command/tick extension points. No interaction state is added to `aim::Snapshot`.
+Without the production adapter, `get_info` reports `interactionProtocol` 0 and interaction commands
 fail closed. Registering an adapter is a capability declaration, not a trust assertion.
 
 ## Validation
@@ -91,8 +91,8 @@ with SHA-256 corruption detection and mandatory readback. The checksum is not an
 claim and does not substitute for physical flash protection. Permission opt-in is never restored
 from the record. Forgetting targets only this key; it never erases a partition or unrelated settings.
 
-Open MENU > SETTINGS > CONNECT PC on the awake display, then choose **Connect this PC to the
-display** in the PC app's display setup. Both screens show a four-group comparison code. Hold
+Open MENU > SETTINGS > CONNECT PC on the awake display and tap CONNECT PC, then choose
+**Connect PC** on the terminal's Device tab (a typed `CONNECT` confirmation is required). Both screens show a four-group comparison code. Hold
 HOLD TO CONFIRM on the display for 1.8 seconds and explicitly confirm matching codes on the PC.
 The PC action pauses/restores only this installation's host and owns the port while connecting.
 Only a valid device proof is stored under current-user DPAPI. Decline, reboot, timeout, storage

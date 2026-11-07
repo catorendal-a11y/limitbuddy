@@ -48,9 +48,9 @@ Read an already installed diagnostic build without enabling acceleration:
 python scripts/collect_graphics_baseline.py --board guition-p4 --port COM_NUMBER --seconds 10 --ppa --output work/graphics.json
 ```
 
-## Standalone C6 result
+## Standalone C6 result (historical, schema 1)
 
-The isolated C6 test reached `completed` within its deadline:
+The isolated C6 test, before the USB-only decision removed controller enabling, reached `completed` within its deadline:
 
 | Runtime result | Value |
 | --- | --- |
@@ -77,5 +77,5 @@ radio initialization. Failure/timeout results remain failures, never guessed cap
 Synthetic tests cover these limits, fragmented replies, boot noise, partial writes, invalid types,
 unverified identities, pixel mismatches and missing fields. All 324 Python regressions passed.
 
-Next gates: target asset decode timing/peak memory, PSRAM cache/LVGL lifetime binding, production
-transport isolation, authenticated BLE and the permission UI. SD and physical S3 remain untested.
+Next gates (as of 2026-10-13): target asset decode timing/peak memory, PSRAM cache/LVGL lifetime binding
+and the permission UI. SD and physical S3 remain untested. Bluetooth is no longer a goal (USB-only).

@@ -1,7 +1,7 @@
 # Device navigation and readability
 
 The 800 x 480 device UI uses a single MENU entry for navigation and secondary actions.
-Normal NOVA/ORBIT home shows MENU and a large, fixed REFRESH button. Refresh is disabled
+The normal companion home shows MENU and a large, fixed REFRESH button. Refresh is disabled
 when the host is disconnected, does not support manual refresh, or is already updating.
 NEXT appears only when more providers
 exist; hiding it does not reposition other controls. Provider cards still open their details.

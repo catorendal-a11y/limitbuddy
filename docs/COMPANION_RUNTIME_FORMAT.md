@@ -1,16 +1,17 @@
 # Companion runtime format and cache checkpoint
 
 The P4 experiment selects **raw LZ4 blocks** for the experimental version-1 runtime cache,
-decoded into the existing **RGB565+A8** layout. Built-in NOVA/ORBIT remain the production fallback.
-The normal P4 companion UI now uses these built-in compressed frames through a startup-allocated
-PSRAM cache. External runtime pack ingestion remains disabled; S3 retains the raw built-ins.
+decoded into the existing **RGB565+A8** layout. Built-in companions remain the production fallback.
+The normal P4 companion UI uses their compressed frames through a startup-allocated
+PSRAM cache; S3 retains the raw built-ins. External packs use the separate version-2 format in
+[COMPANION_ANIMATIONS.md](COMPANION_ANIMATIONS.md).
 This is not a physical S3 validation or a change to the existing USB/AIM1 domain.
 
 ## Physical comparison
 
 All twelve committed poses were exported with byte/hash checks, then measured on the identified
 JC4880P443C_I_W_Y at 360 MHz. Each pose/codec ran five decodes; SHA-256 verified every output.
-Timing excludes hashing. The benchmark is standalone, without display, BLE or SD workloads.
+Timing excludes hashing. The benchmark is standalone, without display, USB or SD workloads.
 
 | Codec | Payload for all 12 poses | Median of pose medians | Slowest pose median | Extra decoder state used |
 | --- | ---: | ---: | ---: | ---: |
@@ -49,9 +50,10 @@ all six NOVA frames while pinning the active frame across replacements:
 
 Allocation happens during initialization, not lazily in `load` or rendering. The pool and frame
 descriptors must outlive their bindings; all bindings must detach before destroying an owner.
-Production P4 allocates this pool once at startup. All twelve poses remain available compressed.
+Production P4 allocates this pool once at startup. All built-in poses (six per companion; 30 on P4 with five companions, 18 on S3
+with three, see `src/companion_features.h`) stay available compressed.
 One raw work pose per companion stays in flash as a safe fallback if allocation, validation or
-decoding fails; thumbnails and provider logos are unchanged. External packs remain disabled.
+decoding fails; thumbnails and provider logos are unchanged.
 
 ## Rendering and ownership
 
@@ -70,7 +72,7 @@ mandatory. No transport callback can update LVGL, and no permission/live state e
 Native LVGL tests cover swaps, conflicting owners, delete/destructor cleanup, fallback origins,
 same-slot position updates, changed external sources and invalid indices. The real cache backend
 was tested on P4 memory. The production renderer additionally verifies pixel-identical decoding
-of all twelve built-ins in native LVGL, stable crop origins, no per-tick decode, pin retirement and
+of the built-ins in native LVGL, stable crop origins, no per-tick decode, pin retirement and
 raw fallback on failed integrity validation. Working-UI measurement is recorded below when verified.
 
 ## Reproduce the developer experiment
@@ -82,13 +84,12 @@ python -m platformio run -e esp32p4-asset-benchmark
 python scripts/collect_asset_baseline.py --port COM_NUMBER --robot nova --output work/asset-target-nova.json
 ```
 
-Repeat with `--robot orbit` and rebuild before collecting. This environment is deliberately excluded
+Repeat with `--robot orbit` (the only other choice) and rebuild before collecting. The experiment below measured only NOVA and ORBIT (twelve poses). This environment is deliberately excluded
 from release board/image selection. Flash only the identified P4 after stopping its host, verify the
 production partition table and keep a local application backup. Restore its normal application
 afterwards. Never flash these fixtures as a normal installer image or overwrite C6/NVS.
 
-Remaining gates: physical S3, versioned animation manifests and authenticated pack activation.
-MicroSD is deferred until measured pack sizes require it. Permissions retain their separate
+Remaining gates: physical S3 validation. MicroSD is deferred until measured pack sizes require it. Permissions retain their separate
 fail-closed USB/local-IPC gates. No Bluetooth product transport is planned.
 
 ## Rebuild compressed built-ins

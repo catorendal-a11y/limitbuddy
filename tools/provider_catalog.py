@@ -2,7 +2,7 @@
 PROVIDERS = {
     'codex': ('Codex', 1, 'Automatic official CLI setup + local tokens and account quota'),
     'zcode': ('ZCode', 2, 'Local tokens + optional Z.AI coding-plan quota key'),
-    'claude': ('Claude Code', 4, 'Local CLI token logs + optional official statusline quota bridge'),
+    'claude': ('Claude Code', 4, 'Local CLI token logs + quota from the Claude Code login or statusline bridge'),
     'gemini': ('Gemini CLI', 8, 'Local CLI tokens; automatic account quota not available'),
     'copilot': ('GitHub Copilot', 16, 'External numeric bridge required; SDK usage events are supported'),
     'cursor': ('Cursor', 32, 'External numeric bridge required; no automatic personal-quota adapter'),

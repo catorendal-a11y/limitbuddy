@@ -49,7 +49,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
 <p align="center">
   <a href="docs/CODEX_SETUP.md"><img alt="Codex local tokens and quota" src="https://img.shields.io/badge/Codex-local%20%2B%20quota-10a37f?style=flat-square"></a>
   <a href="docs/PROVIDERS.md#zcode"><img alt="ZCode local tokens and optional quota key" src="https://img.shields.io/badge/ZCode-local%20%2B%20quota-14b8a6?style=flat-square"></a>
-  <a href="docs/PROVIDERS.md#claude-code"><img alt="Claude Code local tokens and optional quota bridge" src="https://img.shields.io/badge/Claude%20Code-local%20%2B%20bridge-d97757?style=flat-square"></a>
+  <a href="docs/PROVIDERS.md#claude-code"><img alt="Claude Code local tokens and quota" src="https://img.shields.io/badge/Claude%20Code-local%20%2B%20quota-d97757?style=flat-square"></a>
   <a href="docs/PROVIDERS.md#gemini-cli"><img alt="Gemini CLI local activity" src="https://img.shields.io/badge/Gemini%20CLI-local%20activity-4285f4?style=flat-square"></a>
   <br>
   <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="Copilot requires numeric bridge" src="https://img.shields.io/badge/Copilot-bridge%20required-a371f7?style=flat-square"></a>
@@ -60,7 +60,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
 <p align="center">
   <a href="#make-it-yours"><img alt="Five companions: NOVA, ORBIT, CLAUDE, WRAITH and GLITCH" src="https://img.shields.io/badge/companions-5%20to%20choose%20from-35d07f?style=flat-square"></a>
   <a href="#make-it-yours"><img alt="Four saved color themes" src="https://img.shields.io/badge/themes-4%20saved%20palettes-c49aff?style=flat-square"></a>
-  <a href="docs/QUICK_START.md#everyday-use"><img alt="Per-provider quota selection saved on display" src="https://img.shields.io/badge/quota%20windows-per%20AI%20%2B%20saved-54c4f2?style=flat-square"></a>
+  <a href="#make-it-yours"><img alt="Per-provider quota selection saved on display" src="https://img.shields.io/badge/quota%20windows-per%20AI%20%2B%20saved-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
 </p>
 <p align="center">
@@ -75,7 +75,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
   <a href="docs/GITHUB_SECURITY.md"><img alt="Cloud credentials stay on the PC" src="https://img.shields.io/badge/cloud%20keys-PC%20only-35d07f?style=flat-square"></a>
 </p>
 
-*Quota needs the provider's supported account/key/bridge. Gemini, OpenCode and external numeric bridges report activity only. S3 remains experimental. The graphical Windows app and EXE distribution are retired.*
+*Quota needs the provider's supported account, key or bridge. Gemini, OpenCode and external numeric bridges report activity only. S3 remains experimental. The graphical Windows app and EXE distribution are retired.*
 
 [![Support LimitBuddy — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/limitbuddy)
 
@@ -147,7 +147,7 @@ The retired **AI-Monitor.exe** provided a native window with NOVA artwork, a NOV
 
 OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravity still require an advanced numeric bridge; selecting them alone cannot import editor usage. Session events currently support Claude Code only; the other AIs use recorded token activity.
 
-**Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start, minimize/close-to-tray behavior, and whether quitting stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [connection guide](docs/QUICK_START.md#connection-checks-and-host-preferences).
+**Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start, minimize/close-to-tray behavior, and whether quitting stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [terminal guide](docs/TERMINAL.md#commands-and-navigation).
 
 **NOVA system tray:** minimizing hides the desktop window under its NOVA icon near the clock. Click the icon or open the shortcut again to restore the same window. Right-click for Open, Start host, Stop host and Quit. Close-to-tray is optional; hiding retains unsaved settings and never stops the independent host. Existing v1.17.2 display firmware works with this desktop feature.
 
@@ -195,7 +195,7 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 **[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/nova-v1.19.1-rc25-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
 
-The graphical Windows app and EXE distribution are retired. Existing rc14 display firmware works with the terminal-only PC change; updating the display is optional. Preserve settings/history and retarget existing hooks before removing an old EXE installation; see the migration guide above.
+The graphical Windows app and EXE distribution are retired. Preserve settings/history and retarget existing hooks before removing an old EXE installation; see the migration guide above.
 
 GitHub's automatic **Source code (zip)** contains source only, without prebuilt firmware. The terminal release ZIP adds verified board images.
 
@@ -211,7 +211,7 @@ Token activity and account quota are separate signals. A provider can animate th
 | --- | --- | --- |
 | **Codex** | Local Codex database | Signed-in official Codex CLI; setup offers installation/sign-in. |
 | **ZCode** | Local ZCode database | Your optional Z.AI coding-plan API key. |
-| **Claude Code** | Local CLI usage records | Optional documented statusline bridge, offered in Provider setup. |
+| **Claude Code** | Local CLI usage records | Your local Claude Code login (read-only, about every 5 minutes), or the optional statusline bridge. See [Claude Code](docs/PROVIDERS.md#claude-code). |
 | **Gemini CLI** | Recorded local CLI sessions | Activity only; automatic account quota is unavailable. |
 | **GitHub Copilot** | External numeric bridge | Activity only; editor usage is not imported automatically. |
 | **Cursor** | External numeric bridge | Activity only. |
@@ -220,15 +220,17 @@ Token activity and account quota are separate signals. A provider can animate th
 
 **External bridge** means you must connect an integration that supplies cumulative token counts. Selecting that provider alone does not enable automatic tracking. See [provider requirements and bridge examples](docs/PROVIDERS.md).
 
+Claude Code quota works without setup if you are signed in to Claude Code on this PC. Claude Code desktop does not run the statusline command, and recent CLI versions no longer send `rate_limits` in it. The host therefore reads your 5-hour and 7-day quota from Anthropic's undocumented `api/oauth/usage` endpoint, using the login in `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR` is honoured). The token is read only inside the quota worker, never logged or stored, and the endpoint is queried at most every 5 minutes, with backoff on HTTP 429. A fresh statusline bridge reading wins. If the login has expired, the Claude card shows a "check login" notice until you use Claude Code again.
+
 Codex setup uses the official client and your own sign-in flow; the monitor does not ask for an OpenAI password or key. Existing CLI installations and account storage are reused. You can decline installation/sign-in and finish later with **Provider setup**. [Codex setup guide](docs/CODEX_SETUP.md).
 
 ## Make it yours
 
-On the companion screen, open **SET > AI USAGE**. PREV/NEXT chooses an AI. The screen explains its quota windows, how to enable quota in the PC app, the selected window, and the percentage remaining for each reported window.
+On the display, open **MENU > SETTINGS > AI USAGE**. **< PREV** and **NEXT >** choose an AI. The screen explains its quota windows, how to enable quota in the PC app, the selected window, and the percentage remaining for each reported window.
 
 - **Codex:** **5 HOURS** is the short-term limit; **7 DAYS** is the weekly limit. Sign in to the official Codex CLI with ChatGPT from the PC app.
 - **ZCode:** **5 HOURS / 7 DAYS** are model quotas when supplied by the plan; **MONTHLY MCP** is the separate monthly tool-call quota, not a monthly model-token budget. Add your own ZAI Coding Plan key in the PC app. [Official ZCode usage guide](https://zcode.z.ai/en/docs/usage-stats).
-- **Claude Code:** optional statusline bridge for reported **5 HOURS / 7 DAYS**. **Gemini CLI:** local recorded activity only. External editor integrations explain their numeric bridge requirements.
+- **Claude Code:** **5 HOURS / 7 DAYS** from your local Claude Code login, or the optional statusline bridge. **Gemini CLI:** local recorded activity only. External editor integrations explain their numeric bridge requirements.
 
 Known windows remain visible and can be selected before their data arrives. **NOT REPORTED** never means unused quota: the companion shows unavailable until real data is received. Percentages update while Settings is open; **REFRESH** reloads the reported options and requests a host update. **AUTO / MOST URGENT** follows the most urgent quota. Choices are saved independently on the display, and alerts still check every window.
 
@@ -236,7 +238,7 @@ Known windows remain visible and can be selected before their data arrives. **NO
 | --- | --- |
 | ![Codex quota choices and sign-in help](docs/ui/settings-quota-codex.png) | ![ZCode model quotas and monthly MCP tool quota](docs/ui/settings-quota-zcode.png) |
 
-On the display, open **SET > APPEARANCE**. Choose **NOVA** or **ORBIT**, then **Forest**, **Ocean**, **Amethyst** or **Ember**. Changes apply immediately and are saved on the display. Provider branding and warning colors keep their meanings across themes.
+On the display, open **MENU > SETTINGS > APPEARANCE**. Choose a companion (**NOVA**, **ORBIT**, **CLAUDE**, and on the P4 **WRAITH** and **GLITCH**), then **Forest**, **Ocean**, **Amethyst** or **Ember**. Changes apply immediately and are saved on the display. Provider branding and warning colors keep their meanings across themes.
 
 | Robot and color settings | Provider dashboard |
 | --- | --- |
@@ -284,13 +286,14 @@ The robot follows **increases in recorded token counters**. The first sample est
 | No USB connection | Use a data cable and the correct USB port; close other serial tools. |
 | Robot does not react | Check the observed status and Recent host log; use Device / Check USB for the connection. |
 | Codex quota is unavailable | Use Provider setup to finish official CLI sign-in; account quota requires a supported ChatGPT-backed login. |
+| Claude card says "check login" | Open Claude Code once so it renews its login; the card recovers on the next quota query. |
 | External provider stays inactive | Connect its numeric telemetry bridge; selection alone does not supply data. |
 
-This is an activity and quota display, not a billing ledger or per-token stream. Unsupported local formats remain unavailable. Display history clears after a firmware restart. [More troubleshooting](docs/QUICK_START.md#if-something-does-not-work).
+This is an activity and quota display, not a billing ledger or per-token stream. Unsupported local formats remain unavailable. Display history clears after a firmware restart. [More help](docs/TERMINAL.md).
 
 ## Privacy and security
 
-The PC companion reads selected local usage sources, queries provider quota over HTTPS and sends display data over USB. It has no incoming network listener or automatic GitHub code updater. GitHub Actions run on GitHub-hosted machines; this repository has no runner or webhook connected to the maintainer's PC.
+The PC companion reads selected local usage sources, queries provider quota over HTTPS and sends display data over USB. For Claude it uses your existing Claude Code login only to query quota; the token is never logged or stored by LimitBuddy. It has no incoming network listener or automatic GitHub code updater. GitHub Actions run on GitHub-hosted machines; this repository has no runner or webhook connected to the maintainer's PC.
 
 No maintainer credentials are included in the source or release. Your optional Z.AI key is stored in plaintext in local `tools/aim_host.json`, which is ignored by Git; keep that file private. `ZAI_API_KEY` in the process environment takes precedence. The host does not automatically load `.env` files. Obtain the terminal ZIP and checksum from this repository's release page; the current package contains no application EXEs.
 

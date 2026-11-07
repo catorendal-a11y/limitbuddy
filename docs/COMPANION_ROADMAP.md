@@ -3,18 +3,18 @@
 The related-project review informs this project; another project's feature list is not a claim
 that its hardware, security or software has been validated here. USB remains the display transport.
 
-## Included in the local v1.19.0 candidate
+## Included in v1.19.0 (history; current version is in `tools/project_version.py`)
 
 - Provider-specific connection checklist and an observation test without model requests.
 - Optional local numeric history, quota charts and reset-aware consumption estimates.
 - Explicit observational Claude session hooks. Other AIs retain recorded token activity.
-- Family-wide transparent cropping for all six NOVA poses and all six ORBIT poses.
+- Family-wide transparent cropping for the six poses of each built-in companion (measured at the time on NOVA and ORBIT).
   Original canvas origins are retained by `CompanionRenderer`; thumbnails and desktop artwork
   are unchanged. RGB565+A8 frame payload falls from 4,396,320 to 3,349,656 bytes,
   saving 1,046,664 bytes (23.8%) without dropping nontransparent source pixels.
 - Apply a recovered first brightness load once, while preserving any explicit user change.
 - Report a local reader taking more than 15 seconds. USB and quota polling continue; the app
-  recommends restarting a stalled host, or quitting/reopening a stalled desktop monitor. It does not create replacement
+  recommends restarting a stalled host. It does not create replacement
   threads or claim to recover an indefinitely blocked reader automatically.
 - Include free PSRAM in the bounded device information reply, alongside existing free heap.
 - Contain Windows quota workers and read-only Codex app-server processes in kill-on-close
@@ -39,12 +39,12 @@ pose origins. Real P4 operation and physical S3 validation are separate checks.
 
 - Additional companion packs with validated sizes, origins and bounded allocation. Compression
   and PSRAM caching need measurements before committing to a decoder or a storage format.
-- A compact tray quota glance and reset notifications using existing cached observations.
+- Reset notifications using existing cached observations.
 - Provider incident/status indicators that distinguish account quota from service outages.
 - A safe update checker, then verified downloads. Firmware updates remain a separate user action.
 
-BLE/C6 transport and approval of AI tool commands from the screen change the security and hardware
-scope substantially. They are not enabled by observational session reporting and are not part of
+Bluetooth/C6 transport is excluded (USB-only product). Approving AI tool commands from the screen changes the
+security scope substantially; it is not enabled by observational session reporting and is not part of
 this candidate. Graphics acceleration should follow measured rendering bottlenecks, rather than
 the mere availability of P4 hardware features.
 

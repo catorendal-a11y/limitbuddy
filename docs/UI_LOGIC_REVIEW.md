@@ -1,4 +1,11 @@
-# rc11 device navigation follow-up
+# UI logic review (rc10 and rc11)
+
+Dated review records. The Qt desktop app they mention (setup, tray, tabs, dialogs) was retired in rc15 and
+replaced by the terminal ([TERMINAL.md](TERMINAL.md)); its rows remain as history. The firmware UI rules still
+apply: see [device navigation](DEVICE_NAVIGATION.md) and the UI rules in AGENTS.md. Coverage and test counts
+below are rc10 figures.
+
+## rc11 device navigation follow-up
 
 User feedback exposed a presentation defect missed by the rc10 review: selected
 providers were rendered among real sessions on Agents. Rc11 removes those rows,
@@ -13,7 +20,7 @@ session identities, paging, expiry, rollover and session/event timing. Synthetic
 screens do not establish physical touch validation. The rc10 review below is
 historical evidence; its passing tests did not establish satisfactory usability.
 
-# rc10 UI logic review
+## rc10 UI logic review
 
 Scope: desktop action/state flows and the firmware UI. Evidence is scoped to source
 review, synthetic Qt/LVGL execution and separately recorded installed-device checks.

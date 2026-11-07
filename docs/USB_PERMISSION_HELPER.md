@@ -8,7 +8,7 @@ fallback. USB attachment and a local pipe do not authenticate a device approval.
 - `src/interaction/` owns the generic request, state machine and controller independently of
   ClaudeLiveSnapshot. The existing native LVGL dialog uses this domain. Its continuous 1.8-second
   hold, complete visible details, cancellation and one-time final commit gates are preserved.
-- `tools/aim_permission.py` is a separate PermissionRequest helper. It extracts the tool and all
+- `tools/aim_permission.py` is a separate PermissionRequest helper (`tools/claude_permission_setup.py` holds the explicit hook setup, which still expects the retired `AI-Monitor-Permission.exe` helper and is not exposed in the terminal). It extracts the tool and all
   canonical arguments, bounded to 320 printable ASCII characters. Requests that cannot be fully
   reviewed use the normal Claude dialog. It never truncates arguments before approving.
 - Each request has a random 128-bit ID and 256-bit nonce, revision 1 and a maximum 25-second
@@ -62,20 +62,20 @@ and offers only an earned and committed envelope. Failed publication reads revok
 Actual LVGL wrapper tests cover a continuous hold and immediate cancellation on publication failure;
 the lower-level pointer/visibility/drag/touch-read tests remain in place.
 
-The `esp32p4-permission-integration` environment compiles this developer path. Its TX buffer is bounded
-to 2,048 bytes and HWCDC writes use a zero timeout. It starts with device opt-in off, has no wire opt-in
+The `esp32p4-permission-integration` environment compiles this developer path. A signed decision packet is
+bounded (768 bytes in `permission_serial.h`) and is written only when the whole packet fits. It starts with device opt-in off, has no wire opt-in
 command, and is not a production flash/release target. Normal P4/S3 builds keep interactionProtocol 0
 and do not create a permission overlay. Explicit opt-in UI/provider setup is implemented as described
 below; compile/native tests do not establish physical approval safety.
 
 ## Explicit setup and removal
 
-Production NOVA deliberately exposes no USB-permission preference or permission-hook action.
+The production terminal deliberately exposes no USB-permission preference or permission-hook action.
 **Settings > Edit settings** omits the internal `usb_permissions` flag, and normal P4/S3 firmware
 keeps the approval runtime disabled. There is therefore no supported permission helper to install
-or remove in rc18.
+or remove in the current release.
 
-The separate enrollment-only path is available under **Device > Connect PC**. Open
+The separate enrollment-only path is the **Connect PC** action on the terminal's Device tab. Open
 **MENU > SETTINGS > CONNECT PC** on the physical display, tap **CONNECT PC** there, then run the
 terminal action and compare every code group. This can enroll a PC key on supported developer
 firmware; it does not enable permissions or authorize a tool decision.
