@@ -40,7 +40,7 @@ References: [usage stats](https://zcode.z.ai/en/docs/usage-stats), [Coding Plan 
 
 ## Claude Code
 
-**Activity.** Assistant `message.usage` numbers from recent CLI transcripts under `~/.claude/projects/`. Counts are observed, not an invoice. Some CLI versions omit output usage. Desktop/web sessions are not covered.
+**Activity.** Assistant `message.usage` numbers from recent CLI transcripts under `~/.claude/projects/`. Counts are observed, not an invoice. Some CLI versions omit output usage. Claude Code desktop writes the same transcripts and is covered; claude.ai chat in a browser is not.
 
 **Quota.** An API key alone is never a subscription quota. Sources are tried in this order:
 

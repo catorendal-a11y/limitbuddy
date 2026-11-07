@@ -437,13 +437,14 @@ def renew_claude_login():
     """Let the official Claude Code CLI renew its own login file; no model turn, no output kept."""
     command = claude_command()
     if not command:
-        return
+        return False
     try:
         subprocess.run([command, "auth", "status"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, timeout=CLAUDE_RENEW_TIMEOUT_SECONDS, check=False,
                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     except (OSError, subprocess.SubprocessError):
         pass  # The request below then reports the expired login.
+    return True
 
 
 def claude_oauth():
@@ -455,11 +456,12 @@ def claude_oauth():
 def fetch_claude():
     """Claude plan quota via the local Claude Code OAuth login (read-only; token stays in memory)."""
     try:
+        cli_missing = False
         oauth = claude_oauth()
         expires = oauth.get("expiresAt")
         # Claude Code desktop does not rewrite this file, so its 8-hour token lapses unless the CLI renews it.
         if type(expires) in (int, float) and expires - time.time() * 1000 < CLAUDE_RENEW_MARGIN_MS:
-            renew_claude_login()
+            cli_missing = not renew_claude_login()
             oauth = claude_oauth()
         access = credential(oauth.get("accessToken"))
         req = urllib.request.Request(CLAUDE_USAGE_URL)
@@ -484,6 +486,9 @@ def fetch_claude():
             return None, "Claude: no plan quota in response"
         return rows, None
     except urllib.error.HTTPError as error:
+        if cli_missing and error.code in (401, 403):
+            return None, ProviderNotice("Claude: login expired; install the Claude Code CLI to renew it",
+                                        retry_after_seconds(error.headers))
         return None, http_notice("Claude", error)
     except Exception as e:
         return None, provider_failure("Claude", e)

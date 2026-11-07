@@ -729,8 +729,19 @@ class ProviderTests(unittest.TestCase):
         self.assertIs(kwargs['stdout'], host.subprocess.DEVNULL)
         self.assertEqual(kwargs['timeout'], host.CLAUDE_RENEW_TIMEOUT_SECONDS)
         with patch.object(host, 'claude_command', return_value=None), patch.object(host.subprocess, 'run') as run:
-            host.renew_claude_login()
+            self.assertFalse(host.renew_claude_login())
         run.assert_not_called()
+
+    def test_expired_claude_login_without_cli_says_how_to_fix(self):
+        import urllib.error
+        expired = {'claudeAiOauth': {'accessToken': 'old-token', 'expiresAt': 1}}
+        error = urllib.error.HTTPError(host.CLAUDE_USAGE_URL, 401, 'Unauthorized', {}, None)
+        with patch.object(host, 'read_local_json', return_value=expired), \
+                patch.object(host, 'renew_claude_login', return_value=False), \
+                patch.object(host, 'open_provider_request', side_effect=error):
+            rows, notice = host.fetch_claude()
+        self.assertIsNone(rows)
+        self.assertIn('install the Claude Code CLI', notice)
 
     def test_claude_quota_reuses_recent_reply(self):
         panel = Mock(spec=[])

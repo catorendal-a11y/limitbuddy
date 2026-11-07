@@ -12,7 +12,8 @@ def hook(root, require_file=True):
     root = Path(root).resolve()
     helper = root / 'AI-Monitor-Permission.exe'
     if helper.is_symlink() or (require_file and not helper.is_file()) or helper.resolve().parent != root:
-        raise ValueError('Permission helper missing. Install the complete Windows package.')
+        # Terminal releases ship no signed helper EXE, so interactive approvals stay disabled (fail closed).
+        raise ValueError('Interactive permission helper is not part of terminal releases; approvals stay disabled.')
     # Documented exec form: no shell quoting, pipes or interpolation of tool arguments.
     return dict(type='command', command=str(helper), args=[], timeout=30)
 
