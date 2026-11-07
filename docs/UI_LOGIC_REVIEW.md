@@ -1,6 +1,6 @@
 # UI logic review (rc10 and rc11)
 
-Dated review records. The Qt desktop app they mention was retired in rc15 for the terminal ([TERMINAL.md](TERMINAL.md)); those rows are history. Firmware UI rules still apply: [device navigation](DEVICE_NAVIGATION.md) and AGENTS.md. Coverage and test counts are rc10 figures.
+Dated review records. The Qt desktop app they mention was retired in rc15 for the terminal ([TERMINAL.md](TERMINAL.md)); those rows are history. Firmware UI rules still apply: [device navigation](DEVICE_NAVIGATION.md). Coverage and test counts are rc10 figures.
 
 ## rc11 device navigation follow-up
 

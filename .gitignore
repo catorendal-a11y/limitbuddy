@@ -68,3 +68,6 @@ Desktop.ini
 # Private one-shot device capture mailbox
 tools/screen-capture/
 tools/companions/
+
+# Local agent instructions (kept on disk, not published)
+AGENTS.md

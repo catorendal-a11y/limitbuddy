@@ -22,7 +22,7 @@ flowchart LR
   MI["src/mirror: read-only pixels"] -.-> UI
 ```
 
-One serial owner per device. Per-module rules live in [AGENTS.md](../AGENTS.md).
+One serial owner per device.
 
 ## Features
 
