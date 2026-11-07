@@ -224,7 +224,8 @@ class HistoryRecorder:
     def close(self):
         with self.condition:
             self.closed=True; self.condition.notify()
-        self.worker.join(timeout=1)
+        # Bounded, but long enough for a slow disk to finish the last queued write before shutdown.
+        self.worker.join(timeout=5)
 
 
 def calendar_days(now, days):
