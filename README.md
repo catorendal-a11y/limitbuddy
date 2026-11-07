@@ -1,36 +1,13 @@
 # LimitBuddy — ESP32 desk display for AI coding usage limits
 
-**LimitBuddy** keeps your AI coding agents' usage limits on a 4.3-inch ESP32 touchscreen beside your keyboard: session and weekly quota, reset countdowns and low-limit alerts for **Claude Code, OpenAI Codex, Gemini CLI, Z.AI / ZCode, OpenCode, GitHub Copilot, Cursor and Antigravity**. An animated companion — **NOVA**, **ORBIT**, the Claude Code pixel critter **CLAUDE**, and on the P4 also **WRAITH** and **GLITCH** — reacts to recorded token activity on your PC. They are sharp and a little menacing on purpose, not mascots. USB only: no Wi-Fi, no cloud relay, keys stay on the PC.
+**LimitBuddy** puts your AI coding quota on a 4.3-inch ESP32 touchscreen beside your keyboard: session and weekly limits, reset countdowns and low-limit alerts for **Claude Code, OpenAI Codex, Gemini CLI, Z.AI / ZCode, OpenCode, GitHub Copilot, Cursor and Antigravity**. An animated companion reacts to recorded token activity on your PC. USB only: no Wi-Fi, no cloud relay, keys stay on the PC.
 
 *Formerly **AI Monitor P4** (`ai-monitor-p4-s3`); old links redirect here.*
 
-New candidate package: **[v1.19.1-rc25](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25)**,
-with a full-color terminal dashboard, direct device navigation, observed agent sessions,
-local-day history, companion packs, private diagnostics and
-[real USB device-screen capture](docs/DEVICE_MIRROR.md). This is a prerelease;
-physical permission control remains disabled pending hardware/provider validation.
+> [!NOTE]
+> Current candidate: **[v1.19.1-rc25](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25)** (prerelease). It adds a full-color terminal dashboard, direct device navigation, observed agent sessions, local-day history, companion packs, private diagnostics and [real USB device-screen capture](docs/DEVICE_MIRROR.md). Physical permission control stays disabled pending hardware/provider validation.
 
 ![LimitBuddy: ESP32-P4 touchscreen with the ORBIT and CLAUDE companions, actual UI previews and the LimitBuddy terminal](docs/media/github-preview.png)
-
-The [LimitBuddy terminal application](docs/TERMINAL.md) is now the PC app. Download one
-Windows x64 terminal ZIP, extract it into a permanent writable folder, and double-click
-**Install-LimitBuddy.cmd** once. Open a new terminal and type:
-
-```powershell
-limitbuddy
-```
-
-Python and the required libraries are included, so installation needs no additional
-downloads or separate Python, pip, Node.js or npm setup. NOVA remains source code;
-there is no separate NOVA EXE or Qt application.
-NOVA provides setup, host controls, integrations, history, firmware and companion
-operations through the shared backend. **1–5** changes page, **Tab/Enter** uses
-controls, **?** opens help and **Q** quits. Use a 120 × 30 character window or larger.
-Use `limitbuddy --version` or `limitbuddy --help` for command information.
-
-![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
-
-![The Agents page: one card per session, in the same colour as on the display](docs/media/terminal-agents.png)
 
 <p align="center">
   <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/limitbuddy?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
@@ -75,21 +52,65 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
   <a href="docs/GITHUB_SECURITY.md"><img alt="Cloud credentials stay on the PC" src="https://img.shields.io/badge/cloud%20keys-PC%20only-35d07f?style=flat-square"></a>
 </p>
 
-*Quota needs the provider's supported account, key or bridge. Gemini, OpenCode and external numeric bridges report activity only. S3 remains experimental. The graphical Windows app and EXE distribution are retired.*
+
+*Quota needs the provider's supported account, key or bridge. Gemini, OpenCode and external numeric bridges report activity only. S3 is experimental.*
 
 [![Support LimitBuddy — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/limitbuddy)
 
 **[Download LimitBuddy terminal](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a)
 
-**Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
+## How it works
 
-**Two board choices · Five animated companions · Four color themes · No AI preselected · LimitBuddy terminal setup**
+```mermaid
+flowchart LR
+  A["AI tools<br>local usage records"] --> H["PC host<br>limitbuddy"]
+  Q["Provider quota<br>HTTPS from the PC"] --> H
+  H -- "USB serial" --> D["ESP32 display<br>P4 or S3"]
+  T["limitbuddy terminal"] -. "setup, firmware" .-> H
+```
 
-## Watch the two-minute overview
+The host reads local token counters and queries quota; the display only receives numbers. No incoming network listener, no model prompts. See [Privacy and security](#privacy-and-security).
 
-[![Watch LimitBuddy: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
+## Quick install (Windows x64)
 
-**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** (recorded with the earlier, rounder companions) — Meet NOVA and ORBIT, see the actual display UI, and learn how USB, provider setup, quota windows and themes fit together. The video includes the retired graphical PC app as historical footage; current Windows releases use the LimitBuddy terminal. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
+1. Download the [terminal ZIP](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/nova-v1.19.1-rc25-windows-x64-terminal.zip) ([SHA-256](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/SHA256SUMS.txt)) and extract it into a permanent, writable folder (not `Program Files`).
+2. Double-click **Install-LimitBuddy.cmd** once. It registers `limitbuddy` for your user; no admin rights, Python or extra downloads.
+3. Open a **new** terminal and run `limitbuddy`.
+4. **Settings > Edit settings**: choose board (P4 or S3), providers and USB port, then save. No AI is preselected; with several boards connected pick the explicit COM port.
+5. New board? **Device > Firmware > First installation**, review board and port, type `FLASH` (resets display settings). Nothing is flashed automatically.
+6. **Settings > Start host**. It keeps running after you close the terminal; switch on **Start at Windows sign-in** in Edit settings to survive restarts.
+7. Optional: **Agents > Provider events** links Claude Code and/or Codex for the Agents screen and the "needs you" alert. Nothing is linked automatically.
+
+![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
+
+![The Agents page: one card per session, in the same colour as on the display](docs/media/terminal-agents.png)
+
+Keys: **1-5** pages, **Tab/Enter** controls, **?** help, **Q** quit; use a 120 x 30 window or larger. More: [terminal guide](docs/TERMINAL.md), [PC requirements](docs/PC_REQUIREMENTS.md).
+
+> [!WARNING]
+> The ZIP is built by GitHub from this repository but is not publisher-signed. SmartScreen may warn: choose **More info > Run anyway** only for a download from this repository's Releases, and compare `SHA256SUMS.txt`. See [Windows trust](docs/WINDOWS_TRUST.md).
+
+**Troubleshooting**
+
+| Symptom | Fix |
+| --- | --- |
+| `limitbuddy` not recognized | Open a **new** terminal after the installer. |
+| Display says **NO HOST** | **Settings > Start host**; check the port in Edit settings. |
+| No USB connection | Use a data cable and the right port; close other serial tools. |
+| Agents screen empty | Expected until providers are linked (step 7). |
+| Robot does not react | Check observed status and **Settings / Recent host log**; **Device / Check USB**. |
+| Anything else | **History > Diagnostic export** (no keys or conversations) for an [issue](https://github.com/catorendal-a11y/limitbuddy/issues). |
+
+Upgrading, removing or Linux/macOS: [terminal guide](docs/TERMINAL.md#upgrade-and-migrate). GitHub's automatic **Source code (zip)** has no prebuilt firmware.
+
+## What you need
+
+| Display board | Status | USB connector |
+| --- | --- | --- |
+| **GUITION JC4880P433 ESP32-P4** | Supported | Espressif USB data port |
+| **Original Waveshare ESP32-S3-Touch-LCD-4.3** | **Experimental; untested on physical S3** | **USB TO UART** (flashing and daily use) |
+
+The S3 is the original CH422G model, **not B or C**. [Board details](docs/BOARDS.md). You also need a **USB data cable**, a **Windows 10/11 x64 PC** and your own AI account or CLI. The ZIP includes a private Python runtime and both boards' firmware; no PlatformIO or Arduino IDE for ordinary use.
 
 ## Meet your desk companion
 
@@ -101,144 +122,40 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
 | --- | --- | --- |
 | ![WRAITH, a hooded figure with blade eyes and a chest rune](docs/ui/nova-wraith.png) | ![GLITCH, a CRT-headed terminal with block-cursor eyes](docs/ui/nova-glitch.png) | ![Companion and theme settings with five companions on two rows](docs/ui/settings-appearance-glitch.png) |
 
-The companions are sharp and a little menacing on purpose, not mascots. WRAITH and GLITCH are compiled into the P4 firmware only: the S3 image has no flash left for more frames and shows NOVA if one of them is stored. The mood of the figure follows your sessions and quota: a soft radar ring in the mood colour, a status tag (RUN / WAIT / FAULT / DONE), one chip per live session in its colour, a ring for the tightest quota window, and a standby tag when it rests.
+Sharp and a little menacing on purpose, not mascots. WRAITH and GLITCH are P4-only (the S3 has no flash left and shows NOVA instead). The figure shows a mood-coloured radar ring, a status tag (RUN / WAIT / FAULT / DONE), one chip per live session, a ring for the tightest quota window, and a standby tag when idle. Previews are LVGL renders with synthetic data, not photographs.
 
-These previews are rendered from the actual LVGL interface using synthetic data. They are UI renders, not photographs of the display.
+## Providers
 
-The companion panel uses less horizontal space while preserving the robot's size. Usage percentages, provider names and status text have larger fonts so they are easier to read on the 4.3-inch display.
+Token activity and account quota are separate signals: a provider can animate the robot without reporting remaining quota.
 
-## What you need
-
-Choose one of the two firmware targets:
-
-| Display board | Status | USB connector |
+| Provider | Token activity | Quota |
 | --- | --- | --- |
-| **GUITION JC4880P433 ESP32-P4** | Supported | Espressif USB data port |
-| **Original Waveshare ESP32-S3-Touch-LCD-4.3** | **Experimental; not yet tested on physical S3 hardware** | **USB TO UART**, for flashing and daily use |
+| **Codex** | Local Codex database | Signed-in official Codex CLI (setup offers install/sign-in). |
+| **ZCode** | Local ZCode database | Your optional Z.AI coding-plan key. |
+| **Claude Code** | Local CLI usage records | Your Claude Code login (read-only, about every 5 minutes) or the optional statusline bridge. |
+| **Gemini CLI** | Recorded local sessions | Activity only. |
+| **OpenCode** | Local SQLite usage | Activity only. |
+| **GitHub Copilot, Cursor, Antigravity** | External numeric bridge | Activity only; selecting them alone imports nothing. |
 
-The S3 target is the original CH422G model, **not B or C**. [Board compatibility, brightness differences and setup](docs/BOARDS.md).
+An **external bridge** supplies cumulative token counts. See [provider requirements](docs/PROVIDERS.md) and [Codex setup](docs/CODEX_SETUP.md); the monitor never asks for an OpenAI password or key.
 
-- Your selected board from the table above.
-- A **USB data cable** connected to the board's USB data port.
-- A **Windows 10/11 x64 PC**, plus your own AI account or local CLI installation.
-
-The terminal ZIP includes PC source, a verified private Python runtime with hash-locked libraries, and both boards' prebuilt firmware. Install-LimitBuddy.cmd registers `limitbuddy` without extra downloads. No PlatformIO or Arduino IDE is needed for ordinary use. Linux/macOS users can run the terminal from source.
-
-## PC companion: LimitBuddy terminal
-
-Use the five terminal pages for Overview, Agents, History, Device and Settings. Quota
-age, observed sessions and USB status remain separate. Device provides confirmed
-firmware updates, companion packs and screen capture through the existing USB host.
-
-<details>
-<summary>Earlier graphical app previews (retired; historical reference)</summary>
-
-### Earlier graphical PC companion
-
-The retired **AI-Monitor.exe** provided a native window with NOVA artwork, a NOVA program icon, board/provider controls and a terminal-style activity log. Each AI had visible setup instructions, including ZCode's optional Coding Plan key and the requirements for activity-only bridges. Users could save settings, start or stop the hidden host, or open the Firmware tab to install the verified board-specific image. The window read local status; it did not generate AI prompts.
-
-![LimitBuddy desktop app with NOVA, setup controls and terminal-style logs](docs/media/desktop-app.png)
-
-*Actual desktop app rendered with synthetic saved settings. Fresh installations have no board or provider preselected.*
-
-[Preview AI setup and provider choices](docs/media/desktop-ai-setup.png). ZCode's masked key field appears only when it is selected; leave it blank to preserve an existing key.
-
-**Check AI setup** separates local activity, account quota, USB delivery and session events, with a 60-second observation test and the next action for each AI. Optional **History** shows local token increases, quota charts and cautious consumption estimates. Claude users can explicitly link session events so your companion shows **Working**, **Needs you** and **Turn complete**, alongside the separate subscription-quota link. [Checklist, history and session setup](docs/USAGE_INSIGHTS.md).
-
-OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravity still require an advanced numeric bridge; selecting them alone cannot import editor usage. Session events currently support Claude Code only; the other AIs use recorded token activity.
-
-**Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start, minimize/close-to-tray behavior, and whether quitting stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [terminal guide](docs/TERMINAL.md#commands-and-navigation).
-
-**NOVA system tray:** minimizing hides the desktop window under its NOVA icon near the clock. Click the icon or open the shortcut again to restore the same window. Right-click for Open, Start host, Stop host and Quit. Close-to-tray is optional; hiding retains unsaved settings and never stops the independent host. Existing v1.17.2 display firmware works with this desktop feature.
-
-[Preview the tray settings](docs/media/desktop-tray-settings.png) (actual desktop app with synthetic setup, no account data).
-
-**Guided setup:** the progress checklist and Next button lead through display, USB port, AI choices, saving and connection checks. Start stays disabled while those selections are incomplete or unsaved. A new/factory board gets firmware help; nothing is flashed automatically. Reopening with automatic host start enabled reuses an existing host.
-
-[Preview guided setup](docs/media/desktop-guided-setup.png) · [Desktop performance measurements](docs/DESKTOP_PERFORMANCE.md).
-
-</details>
-
-## Get running on Windows
-
-**Before you start**
-
-- **Hardware:** a supported 4.3-inch display (Guition ESP32-P4, or the experimental Waveshare S3), a data-capable USB cable, and a Windows 10/11 PC (x64). Without the display there is little to see.
-- **Not code-signed:** the ZIP is built by GitHub from this repository (check it against `SHA256SUMS.txt`), but it is not signed by a publisher. Windows SmartScreen may warn the first time: choose **More info > Run anyway** only if you downloaded it from this repository's Releases page.
-- **Extract first:** unpack the whole ZIP into a permanent folder you can write to (not `Program Files`, not inside the ZIP viewer) and keep it there; the `limitbuddy` command points at that folder.
-
-**Steps**
-
-1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25) and extract it into a permanent writable folder.
-2. **Install the command once.** Double-click **Install-LimitBuddy.cmd**. It checks the bundled runtime and registers `limitbuddy` for your user (the older `nova` command keeps working as an alias). Open a new terminal and type `limitbuddy`. No separate Python, package downloads or administrator rights are needed.
-3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. To see sessions on the **Agents** screen and get the "agent needs you" alert, open **Agents > Provider events** in the terminal and link Claude Code and/or Codex; nothing is linked automatically.
-4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing LimitBuddy boards can use the application update to preserve settings. Nothing is flashed automatically.
-5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it, unless you switch on **Start at Windows sign-in** in **Settings > Edit settings**: the display then comes back by itself after every restart (a per-user Startup entry; it needs no administrator rights and can also be turned off in Windows Settings > Apps > Startup).
-
-**Something not working?**
-
-- `limitbuddy` is not recognized: open a **new** terminal after running **Install-LimitBuddy.cmd**.
-- The display says **NO HOST**: use **Settings > Start host**, and check the port in **Settings > Edit settings** (pick the explicit COM port if several boards are connected). Optionally switch on **Start at Windows sign-in** so it comes back after a restart.
-- The Agents screen is empty: that is expected until the providers are linked (see step 3); the screen names the ones that are not linked.
-- Anything else: **History > Diagnostic export** writes a report with no keys or conversations that you can attach to an [issue](https://github.com/catorendal-a11y/limitbuddy/issues).
-
-**Upgrading from an earlier release?** Each release lives in its own folder, and your settings stay in the old one until you move them:
-
-1. Extract the new ZIP into a new permanent folder (for example `LimitBuddy\app-rc19`) and double-click its **Install-LimitBuddy.cmd**. `limitbuddy` now opens the new version.
-2. In the **old** version, use **Settings > Stop host**.
-3. Copy `tools\aim_host.json` (board, port, providers and keys) and, if you use history, the `tools\activity` folder from the old folder into the new one.
-4. Run `limitbuddy`, check **Settings**, then **Settings > Start host**. If you use **Start at Windows sign-in**, open **Edit settings** and press **Save** once so the Startup entry points at the new folder.
-5. Update the display from the new version: **Device > Firmware > Application update** keeps display settings.
-6. If you linked provider events or the Claude quota bridge, re-link them from **Agents**. Keep the old folder until everything works.
-
-**Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
-
-**[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/nova-v1.19.1-rc25-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
-
-The graphical Windows app and EXE distribution are retired. Preserve settings/history and retarget existing hooks before removing an old EXE installation; see the migration guide above.
-
-GitHub's automatic **Source code (zip)** contains source only, without prebuilt firmware. The terminal release ZIP adds verified board images.
-
-## PC requirements
-
-Use Windows 10/11 x64, a USB data cable and your supported display. Windows Terminal is recommended. The ZIP includes Python and its dependencies; installation works offline after downloading it. Provider quotas and optional AI-client setup still need internet. No Qt, Node.js, npm, Git, PlatformIO or Arduino IDE is required for ordinary use. [PC requirements](docs/PC_REQUIREMENTS.md) · [Codex setup](docs/CODEX_SETUP.md).
-
-## Provider setup
-
-Token activity and account quota are separate signals. A provider can animate the robot from local token records without providing a remaining-quota percentage.
-
-| Provider | Token activity | Quota display |
-| --- | --- | --- |
-| **Codex** | Local Codex database | Signed-in official Codex CLI; setup offers installation/sign-in. |
-| **ZCode** | Local ZCode database | Your optional Z.AI coding-plan API key. |
-| **Claude Code** | Local CLI usage records | Your local Claude Code login (read-only, about every 5 minutes), or the optional statusline bridge. See [Claude Code](docs/PROVIDERS.md#claude-code). |
-| **Gemini CLI** | Recorded local CLI sessions | Activity only; automatic account quota is unavailable. |
-| **GitHub Copilot** | External numeric bridge | Activity only; editor usage is not imported automatically. |
-| **Cursor** | External numeric bridge | Activity only. |
-| **Antigravity** | External numeric bridge | Activity only. |
-| **OpenCode** | Local SQLite usage | Automatic local activity; no remaining account quota. |
-
-**External bridge** means you must connect an integration that supplies cumulative token counts. Selecting that provider alone does not enable automatic tracking. See [provider requirements and bridge examples](docs/PROVIDERS.md).
-
-Claude Code quota works without setup if you are signed in to Claude Code on this PC. Claude Code desktop does not run the statusline command, and recent CLI versions no longer send `rate_limits` in it. The host therefore reads your 5-hour and 7-day quota from Anthropic's undocumented `api/oauth/usage` endpoint, using the login in `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR` is honoured). The token is read only inside the quota worker, never logged or stored, and the endpoint is queried at most every 5 minutes, with backoff on HTTP 429. A fresh statusline bridge reading wins. If the login has expired, the Claude card shows a "check login" notice until you use Claude Code again.
-
-Codex setup uses the official client and your own sign-in flow; the monitor does not ask for an OpenAI password or key. Existing CLI installations and account storage are reused. You can decline installation/sign-in and finish later with **Provider setup**. [Codex setup guide](docs/CODEX_SETUP.md).
+> [!NOTE]
+> **Claude quota needs no setup if you are signed in to Claude Code on this PC.** Claude Code desktop does not run the statusline command, and recent CLI versions no longer send `rate_limits` there. The host therefore reads your 5-hour and 7-day quota from Anthropic's undocumented `api/oauth/usage` endpoint, using the login in `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR` is honoured). The token is read only inside the quota worker, never logged or stored; the endpoint is queried at most every 5 minutes, with backoff on HTTP 429. A fresh statusline reading wins. If the login expired, the Claude card shows "check login" until you use Claude Code again.
 
 ## Make it yours
 
-On the display, open **MENU > SETTINGS > AI USAGE**. **< PREV** and **NEXT >** choose an AI. The screen explains its quota windows, how to enable quota in the PC app, the selected window, and the percentage remaining for each reported window.
+On the display: **MENU > SETTINGS**.
 
-- **Codex:** **5 HOURS** is the short-term limit; **7 DAYS** is the weekly limit. Sign in to the official Codex CLI with ChatGPT from the PC app.
-- **ZCode:** **5 HOURS / 7 DAYS** are model quotas when supplied by the plan; **MONTHLY MCP** is the separate monthly tool-call quota, not a monthly model-token budget. Add your own ZAI Coding Plan key in the PC app. [Official ZCode usage guide](https://zcode.z.ai/en/docs/usage-stats).
-- **Claude Code:** **5 HOURS / 7 DAYS** from your local Claude Code login, or the optional statusline bridge. **Gemini CLI:** local recorded activity only. External editor integrations explain their numeric bridge requirements.
+| Where | What |
+| --- | --- |
+| **AI USAGE** | **< PREV / NEXT >** picks an AI and its quota window; **AUTO / MOST URGENT** follows the tightest; **REFRESH** requests a host update. Saved on the display; alerts still check every window. |
+| **APPEARANCE** | Companion (NOVA, ORBIT, CLAUDE; P4 also WRAITH, GLITCH) and theme (**Forest, Ocean, Amethyst, Ember**). Applies immediately and is saved. |
 
-Known windows remain visible and can be selected before their data arrives. **NOT REPORTED** never means unused quota: the companion shows unavailable until real data is received. Percentages update while Settings is open; **REFRESH** reloads the reported options and requests a host update. **AUTO / MOST URGENT** follows the most urgent quota. Choices are saved independently on the display, and alerts still check every window.
+Quota windows: **Codex** 5 HOURS / 7 DAYS. **ZCode** 5 HOURS / 7 DAYS model quotas when the plan supplies them, plus **MONTHLY MCP** (tool calls, not model tokens; [usage guide](https://zcode.z.ai/en/docs/usage-stats)). **Claude Code** 5 HOURS / 7 DAYS. **NOT REPORTED** never means unused: the companion shows unavailable until real data arrives.
 
 | Codex window selection | ZCode window selection |
 | --- | --- |
 | ![Codex quota choices and sign-in help](docs/ui/settings-quota-codex.png) | ![ZCode model quotas and monthly MCP tool quota](docs/ui/settings-quota-zcode.png) |
-
-On the display, open **MENU > SETTINGS > APPEARANCE**. Choose a companion (**NOVA**, **ORBIT**, **CLAUDE**, and on the P4 **WRAITH** and **GLITCH**), then **Forest**, **Ocean**, **Amethyst** or **Ember**. Changes apply immediately and are saved on the display. Provider branding and warning colors keep their meanings across themes.
 
 | Robot and color settings | Provider dashboard |
 | --- | --- |
@@ -248,72 +165,54 @@ On the display, open **MENU > SETTINGS > APPEARANCE**. Choose a companion (**NOV
 | --- | --- |
 | ![ORBIT companion in the Amethyst theme](docs/ui/orbit-amethyst.png) | ![NOVA companion in the Ember theme](docs/ui/nova-ember.png) |
 
-[View the provider details screen](docs/ui/details-ocean.png).
-
 **Read the display at a glance**
 
 | Needs you | Even-burn marker | Tightest window | History |
 | --- | --- | --- | --- |
 | ![NOVA with a WAIT tag while a session needs you](docs/ui/nova-session-waiting.png) | ![A white marker shows where an even burn would be by now](docs/ui/dashboard-pace-marker.png) | ![A ring shows the tightest quota window](docs/ui/nova-urgent-dial.png) | ![Seven-day history chart with weekday names](docs/ui/history-today-7d.png) |
 
-The white marker on a quota bar is where an even burn would stand at this point of the window: a "left" fill shorter than the marker means the quota is going faster than its window. Cards with a low or critical window get an amber or red edge. [What each mark means](docs/QUICK_START.md#reading-the-display).
+The white marker on a bar is where an even burn would be by now: a "left" fill shorter than the marker means the quota is going faster than its window. Low or critical cards get an amber or red edge. [What each mark means](docs/QUICK_START.md#reading-the-display).
 
-The display also includes reset countdowns, manual refresh, low/critical quota warnings, session history, brightness presets, gradual idle dimming and scheduled night brightness. P4 dims its LED backlight with PWM; S3 dims the rendered image and switches LEDs off only at zero. See [board differences](docs/BOARDS.md#brightness-and-performance).
-
-[Preview the larger quota alert](docs/ui/quota-critical-notification.png).
-
-## Everyday use
-
-| Control | What it does |
-| --- | --- |
-| **Settings / Edit settings** | Choose board, providers and port; preserve saved keys unless explicitly changed. |
-| **Start host / Stop host** | Manage only this folder's independent background companion. |
-| **Agents / Check AI setup** | Check provider readiness and instructions. **Codex sign-in** opens the official setup console; Claude has a separate quota-link action. |
-| **Firmware** | Review the selected board, chip and verified image before typing FLASH. |
-| **Settings / Recent host log** | Read bounded local messages; API keys and control sequences are filtered. |
-| **? Help** | Show terminal navigation and keyboard help. |
-
-Use `limitbuddy --version` and `limitbuddy --help` for command information. `limitbuddy --check` uses synthetic data; check the live USB connection on the Device page.
-
-When upgrading, stop the old host before opening a newly extracted package. Preserve private configuration/history and retarget existing integrations before removing the old runtime. [Upgrade instructions](docs/TERMINAL.md#upgrade-and-migrate).
+Also: reset countdowns, manual refresh, low/critical warnings ([larger alert preview](docs/ui/quota-critical-notification.png)), session history, brightness presets, idle dimming and night brightness. P4 dims with PWM; S3 dims the rendered image ([board differences](docs/BOARDS.md#brightness-and-performance)). [Provider details screen](docs/ui/details-ocean.png).
 
 ## If the robot is quiet
 
-The robot follows **increases in recorded token counters**. The first sample establishes a baseline; existing totals do not count as fresh activity. Some clients save token usage only when a request finishes, so activity can lag generation.
+The robot follows **increases in recorded token counters**. The first sample is a baseline, and some clients save usage only when a request finishes, so activity can lag. This is an activity and quota display, not a billing ledger or per-token stream. Unsupported local formats stay unavailable; display history clears after a firmware restart.
 
 | Symptom | First check |
 | --- | --- |
-| No USB connection | Use a data cable and the correct USB port; close other serial tools. |
-| Robot does not react | Check the observed status and Recent host log; use Device / Check USB for the connection. |
-| Codex quota is unavailable | Use Provider setup to finish official CLI sign-in; account quota requires a supported ChatGPT-backed login. |
-| Claude card says "check login" | Open Claude Code once so it renews its login; the card recovers on the next quota query. |
-| External provider stays inactive | Connect its numeric telemetry bridge; selection alone does not supply data. |
-
-This is an activity and quota display, not a billing ledger or per-token stream. Unsupported local formats remain unavailable. Display history clears after a firmware restart. [More help](docs/TERMINAL.md).
+| Codex quota unavailable | **Provider setup**: finish official CLI sign-in (needs a ChatGPT-backed login). |
+| Claude card says "check login" | Open Claude Code once; the card recovers on the next query. |
+| External provider inactive | Connect its numeric bridge. |
 
 ## Privacy and security
 
-The PC companion reads selected local usage sources, queries provider quota over HTTPS and sends display data over USB. For Claude it uses your existing Claude Code login only to query quota; the token is never logged or stored by LimitBuddy. It has no incoming network listener or automatic GitHub code updater. GitHub Actions run on GitHub-hosted machines; this repository has no runner or webhook connected to the maintainer's PC.
-
-No maintainer credentials are included in the source or release. Your optional Z.AI key is stored in plaintext in local `tools/aim_host.json`, which is ignored by Git; keep that file private. `ZAI_API_KEY` in the process environment takes precedence. The host does not automatically load `.env` files. Obtain the terminal ZIP and checksum from this repository's release page; the current package contains no application EXEs.
+- The PC reads selected local usage sources, queries provider quota over HTTPS and sends display data over USB. No incoming network listener, no automatic code updater.
+- For Claude, your existing login is used only to query quota; never logged or stored.
+- Your optional Z.AI key is stored in plaintext in git-ignored `tools/aim_host.json`; keep it private. `ZAI_API_KEY` in the environment takes precedence; `.env` files are not loaded.
+- GitHub Actions run on GitHub-hosted machines; no runner or webhook connects to the maintainer's PC. No maintainer credentials ship in source or releases.
 
 [Security and private reporting](SECURITY.md) · [Host security review](docs/SECURITY_REVIEW.md) · [GitHub safeguards](docs/GITHUB_SECURITY.md)
 
+## Watch the overview
+
+[![Watch LimitBuddy: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
+
+[Two-minute video](https://www.youtube.com/watch?v=1JR9_E1lWDg) with subtitles (earlier companions and the retired graphical PC app; current releases use the terminal). UI previews use synthetic data.
+
 ## Run from source or contribute
 
-Built one? [Share your display in Show and tell](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/show-and-tell). Have a setup question? Use [Q&A](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a). Suggest improvements in [Ideas](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/ideas), or [report a reproducible bug](https://github.com/catorendal-a11y/limitbuddy/issues/new/choose). Keep keys, account data and private logs out of posts.
+Built one? [Show and tell](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/show-and-tell) · [Q&A](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a) · [Ideas](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/ideas) · [Report a bug](https://github.com/catorendal-a11y/limitbuddy/issues/new/choose). Keep keys, account data and private logs out of posts. A GitHub star helps others find the project.
 
-If the project helps your setup, a GitHub star makes it easier to find again. Follow the repository's releases to hear about updates.
-
-Source installations require **Python 3.10+**. On Windows, double-click **AI-Monitor.bat** to create the local environment and open the terminal. On Linux/macOS:
+Source needs **Python 3.10+**. Windows: double-click **AI-Monitor.bat**. Linux/macOS:
 
 ```sh
 sh setup.sh
 .venv/bin/python tools/aim_terminal.py
 ```
 
-Firmware builds, serial permissions and test dependencies are covered in the [developer guide](docs/DEVELOPMENT.md). The [release guide](docs/RELEASING.md) explains the separate build/publish jobs and reviewed draft releases. Ordinary source pushes do not publish a release.
+[Developer guide](docs/DEVELOPMENT.md) · [Release guide](docs/RELEASING.md) · [Contributing](CONTRIBUTING.md) · [Provider roadmap](docs/PROVIDER_ROADMAP.md) · [All releases](https://github.com/catorendal-a11y/limitbuddy/releases)
 
-[Contributing](CONTRIBUTING.md) · [Provider roadmap](docs/PROVIDER_ROADMAP.md) · [All releases](https://github.com/catorendal-a11y/limitbuddy/releases)
+The graphical Windows app and EXE distribution are retired; see the [migration notes](docs/TERMINAL.md#upgrade-and-migrate).
 
-Project-owned code and original NOVA/ORBIT artwork use [MIT](LICENSE). Drivers, dependencies, fonts and provider marks retain their own terms: [third-party notices](THIRD_PARTY_NOTICES.md), [NOVA/logo sources](assets/nova/SOURCES.md) and [ORBIT artwork](assets/orbit/SOURCES.md). This is an independent project and is not endorsed by its AI providers.
+Project-owned code and original NOVA/ORBIT artwork use [MIT](LICENSE). Drivers, dependencies, fonts and provider marks keep their own terms: [third-party notices](THIRD_PARTY_NOTICES.md), [NOVA/logo sources](assets/nova/SOURCES.md), [ORBIT artwork](assets/orbit/SOURCES.md). Independent project, not endorsed by its AI providers.

@@ -1,28 +1,30 @@
 # Quick start
 
-Follow [LimitBuddy terminal installation](TERMINAL.md). The PC application is now the terminal
-command `limitbuddy`; the graphical Windows app and EXE installer are retired.
+The PC app is the `limitbuddy` terminal command ([install guide](TERMINAL.md)); the graphical app and EXE are retired.
 
-Choose and save the board, USB port and providers in Settings, then Start host.
-Use Overview/Device to check actual USB status and Agents to check observational links.
-No board/provider is selected automatically and setup never flashes hardware.
+```mermaid
+flowchart LR
+  A["Install ZIP<br>Install-LimitBuddy.cmd"] --> B["limitbuddy"]
+  B --> C["Settings:<br>board, port, providers"]
+  C --> D["Device > Firmware<br>new board only"]
+  D --> E["Settings > Start host"]
+  E --> F["Check Overview, Device<br>and Agents"]
+```
 
-Claude Code quota needs no extra setup if you are signed in to Claude Code on this PC. The host
-reads your 5-hour and 7-day quota about every 5 minutes using that login (details in
-[Claude Code](PROVIDERS.md#claude-code)). If the Claude card says "check login", use Claude Code
-once so it renews its login.
+1. Choose and save board, USB port and providers in **Settings**. Nothing is preselected and setup never flashes hardware.
+2. **Start host**, then check real USB status in **Overview** / **Device** and observational links in **Agents**.
 
-See [provider setup](PROVIDERS.md) and [development](DEVELOPMENT.md).
+> [!TIP]
+> Claude Code quota needs no extra setup when you are signed in to Claude Code on this PC: the host reads your 5-hour and 7-day quota about every 5 minutes with that login ([details](PROVIDERS.md#claude-code)). If the Claude card says "check login", use Claude Code once to renew it.
+
+More: [provider setup](PROVIDERS.md) · [development](DEVELOPMENT.md).
 
 ## Reading the display
 
-- **Header:** the tightest quota window over every selected AI, for example "29% left / CODEX Week".
-- **Cards:** an amber or red edge means a window is low or critical. The faint ticks in each bar are a
-  25 / 50 / 75 % scale, not warning thresholds.
-- **White marker on a bar:** where an even burn would be by now, from the window length and its reset
-  time. With "left" bars, a fill shorter than the marker means the quota is going faster than the
-  window; longer means you are ahead. It is hidden when the reset time is unknown.
-- **Ring on the NOVA screen:** the same tightest window as a ring with its percentage, provider and
-  window name. It is hidden without a fresh host and quota reading.
-- **History chart:** weekday names come from the host's local date; observed days show their token
-  count above the bar and the newest bar is solid. Unobserved days stay a thin tick, never zero.
+| Element | Meaning |
+| --- | --- |
+| **Header** | Tightest quota window over all selected AIs, e.g. "29% left / CODEX Week". |
+| **Card edge** | Amber or red = a window is low or critical. Faint bar ticks are a 25 / 50 / 75 % scale, not thresholds. |
+| **White marker on a bar** | Where an even burn would be by now (window length and reset time). With "left" bars, a fill shorter than the marker means quota is going faster than the window; longer means you are ahead. Hidden when the reset time is unknown. |
+| **Ring on the NOVA screen** | The same tightest window with percentage, provider and window name. Hidden without a fresh host and quota reading. |
+| **History chart** | Weekday names from the host's local date; observed days show their token count and the newest bar is solid. Unobserved days are a thin tick, never zero. |

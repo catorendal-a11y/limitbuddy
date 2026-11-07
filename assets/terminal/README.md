@@ -1,10 +1,5 @@
 # Terminal artwork
 
-`nova.json` contains four 40 × 26 RGB rasters generated from the project's
-original NOVA vectors in `assets/nova/`: work, attention, error and done.
-They retain the original artwork's MIT license and attribution; see
-`assets/nova/SOURCES.md`. No third-party provider marks are included.
+`nova.json` holds four 40 x 26 RGB rasters (work, attention, error, done) generated from the original NOVA vectors in `assets/nova/`. They keep that artwork's MIT license and attribution (`assets/nova/SOURCES.md`); no third-party provider marks are included.
 
-Regenerate with `.venv\Scripts\python.exe scripts/generate_terminal_assets.py`.
-PySide6 (Qt) is a development dependency for generation only. The terminal uses Python's
-standard library and Rich (inside Textual) to draw the pixels as colored half-block cells.
+Regenerate: `.venv\Scripts\python.exe scripts/generate_terminal_assets.py`. PySide6 (Qt) is needed for generation only; the terminal draws the pixels as colored half-block cells with Python's standard library and Rich (inside Textual).

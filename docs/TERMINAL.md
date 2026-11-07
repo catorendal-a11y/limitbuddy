@@ -1,80 +1,58 @@
 # LimitBuddy terminal
 
-NOVA is the PC application. Start it by typing `limitbuddy`; it runs in the current terminal.
-The distribution contains Python source and board firmware, without a NOVA application EXE or Qt.
+NOVA is the PC application: type `limitbuddy` and it runs in the current terminal. The release holds Python source and board firmware, with no NOVA EXE or Qt.
 
 ## Install on Windows
 
 1. Download `nova-v1.19.1-rc25-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25).
-2. Extract it into a permanent writable folder. Keep that folder after installation.
-3. Double-click **Install-LimitBuddy.cmd**. It verifies the included runtime and registers only this user's `limitbuddy` command. No administrator access is needed.
-4. Open a new terminal, from any folder, and type:
+2. Extract it into a permanent writable folder and keep it there.
+3. Double-click **Install-LimitBuddy.cmd**: it verifies the bundled runtime and registers only this user's `limitbuddy` command. No administrator access.
+4. Open a new terminal in any folder and run `limitbuddy`.
 
-```powershell
-limitbuddy
-```
+The ZIP holds Python 3.13.16, hash-locked dependencies, NOVA source and both firmware images, so install needs no extra downloads, pip, Python, Node.js or npm. The runtime stays inside the folder, does not replace other Pythons and does not change the execution policy. The interpreter and DLLs under `runtime/` are vendor components with original licenses and a per-file manifest; the installer checks hashes first and fails with a request to re-extract if files changed. Provider requests and optional AI-client setup still need internet.
 
-One ZIP contains Python 3.13.16, hash-locked dependencies, NOVA source and both firmware
-images. After downloading and extracting it, installation needs no extra package downloads,
-pip commands, Python installation, Node.js or npm. The runtime stays inside this folder;
-it does not replace other Python installations or change the global execution policy.
-Provider requests and optional official AI-client setup still need their own internet access.
-
-NOVA remains a terminal program without its own EXE or Qt frontend. The upstream Python
-interpreter and dependency DLLs are vendor components under `runtime/`, with original
-license files and a per-file manifest. The installer checks hashes before running Python.
-Missing or changed files fail with a request to extract the complete release again.
-
-Advanced source-only users can still run `Install-LimitBuddy.ps1` directly. A Git checkout or
-GitHub's automatic source archive has no bundled runtime and requires Python 3.10+ plus
-internet for setup. The normal Windows x64 release needs neither prerequisite. Setup does
-not select providers, sign into an AI account, flash hardware or enable physical approvals.
+Setup does not select providers, sign into an AI account, flash hardware or enable physical approvals. A Git checkout or GitHub's source archive has no bundled runtime and needs Python 3.10+ plus internet; advanced users can run `Install-LimitBuddy.ps1` directly.
 
 ## Commands and navigation
 
-```powershell
-limitbuddy --version
-limitbuddy --help
-limitbuddy --check
-```
+| Command / key | What it does |
+| --- | --- |
+| `limitbuddy --version`, `--help` | Command information |
+| `limitbuddy --check` | Renders synthetic data; does **not** test USB or providers |
+| **1-5** | Pages |
+| **Tab / Enter** | Controls |
+| **R** | Reload local metadata |
+| **?** / **Esc** / **Q** | Help / cancel form / quit |
 
-`--check` renders synthetic data; it does not establish a real USB/provider connection.
-Use Overview and Device / Check USB for live connection status. In Settings, choose and save
-your board, USB port and providers, then Start host. Keys: 1–5 pages, Tab/Enter controls,
-R reload local metadata, ? help, Escape cancel forms, Q quit. Source launcher:
-`AI-Monitor-Terminal.bat`. `AI-Monitor.bat` is a compatibility alias for the same terminal.
+Source launcher: `AI-Monitor-Terminal.bat` (`AI-Monitor.bat` is an alias).
 
-Quota, observed sessions and USB connection are separate signals. Unknown quota remains
-unknown. Claude quota comes from your local Claude Code login or the optional statusline bridge, otherwise Claude shows activity only. Stale agent events show Last rather than current
-work. Opening and refreshing the dashboard never starts a model request or a second USB owner.
-Invalid settings stay in the form. Secret fields are masked and unchanged keys are preserved.
-
-Device / Firmware with **Application update** writes only the application partition after exact board identification and
-confirmation. First installation resets display settings. Source-only Git downloads contain
-no firmware: use the terminal release ZIP with both images, or build and collect them as
-explained in DEVELOPMENT.md. Physical permissions remain disabled; S3 is experimental.
+- In **Settings**, choose and save board, USB port and providers, then **Start host**. Use **Overview** and **Device / Check USB** for live status.
+- Quota, observed sessions and USB connection are separate signals. Unknown quota stays unknown; stale agent events show Last, not current work.
+- Claude quota comes from your local Claude Code login or the optional statusline bridge; otherwise Claude shows activity only.
+- Opening or refreshing the dashboard never starts a model request or a second USB owner.
+- Invalid settings stay in the form; secret fields are masked and unchanged keys are preserved.
+- **Device / Firmware > Application update** writes only the application partition after exact board identification and confirmation. **First installation** resets display settings. Source-only downloads contain no firmware: use the release ZIP or build per [DEVELOPMENT.md](DEVELOPMENT.md). Physical permissions stay disabled; S3 is experimental.
 
 ## Start at Windows sign-in
 
-Off by default. Switch it on in Settings > Edit settings: LimitBuddy adds one value named
-`LimitBuddy` to the current user's Run key (Windows Settings > Apps > Startup lists it and can
-disable it), pointing at this folder's windowless Python and `tools\aim_control.py --start-host`.
-No administrator rights, scheduled task or service is involved. Turning the setting off removes
-the value, but only when it starts this installation. If another program already uses the name
-`LimitBuddy`, Save stops with a message and changes nothing. A host that fails to start at sign-in
-(for example an unplugged display) simply waits for USB like a manually started one.
+Off by default. **Settings > Edit settings** adds one `LimitBuddy` value to the current user's Run key (listed under Windows Settings > Apps > Startup), pointing at this folder's windowless Python and `tools\aim_control.py --start-host`. No administrator rights, scheduled task or service.
+
+- Turning it off removes the value, but only if it starts this installation.
+- If another program already uses the name `LimitBuddy`, Save stops with a message and changes nothing.
+- A host that cannot start at sign-in (for example an unplugged display) just waits for USB.
 
 ## Upgrade and migrate
 
-Extract a new release to a new permanent folder and run `Install-LimitBuddy.cmd`, then stop the old
-host before moving private settings/history: copy `tools\aim_host.json` (settings and keys) and,
-when history is enabled, the `tools\activity` folder into the new folder's `tools`. Keep the original folder until the new host,
-USB connection and observational hooks have been checked. Re-run `Install-LimitBuddy.cmd` from the new
-folder to retarget the owned command. If **Start at Windows sign-in** is on, open Settings > Edit settings
-in the new version and press Save once: that rewrites the Startup entry so it starts the new folder.
-Re-link only previously opted-in provider integrations
-from Agents; provider selection alone is not permission to install hooks. An old EXE installation
-must be migrated before uninstalling it because its host/hooks use the old runtime paths.
+1. Extract the new release to a **new** permanent folder and run its `Install-LimitBuddy.cmd` (retargets `limitbuddy`).
+2. Stop the old host (**Settings > Stop host**).
+3. Copy `tools\aim_host.json` (settings and keys) and, if history is on, `tools\activity` into the new folder's `tools`.
+4. Run `limitbuddy`, check **Settings**, then **Start host**. With **Start at Windows sign-in** on, open **Edit settings** and press **Save** once to rewrite the Startup entry.
+5. Update the display: **Device > Firmware > Application update** keeps display settings.
+6. Re-link only previously opted-in integrations (provider events, Claude quota bridge) from **Agents**; provider selection alone never installs hooks.
+7. Keep the old folder until host, USB and hooks work.
+
+> [!IMPORTANT]
+> Migrate an old EXE installation before uninstalling it: its host and hooks use the old runtime paths. P4 firmware v1.12.0 or later keeps its identity with the new host; a new S3 board needs its own first installation.
 
 ## Remove the command
 
@@ -84,14 +62,8 @@ From the installed folder:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-LimitBuddy.ps1 -Uninstall
 ```
 
-This removes only the owned shim and its PATH entry, plus the **Start at Windows sign-in**
-Startup entry when it starts this folder (an entry for another folder or another program is kept).
-It retains settings, history and the folder, and does not stop the host. Stop the host and unlink this installation's integrations
-before deleting its folder. Other users' PATH and unrelated `limitbuddy` commands are preserved.
+This removes only the owned shim and PATH entry, plus the Startup entry if it starts this folder. Settings, history and the folder stay, and the host is not stopped. Stop the host and unlink this installation's integrations before deleting the folder. Other users' PATH and unrelated `limitbuddy` commands are untouched.
 
 ## Development and Linux/macOS
 
-Run `setup.ps1 -BuildTools` for development on Windows. No graphical runtime is installed.
-Optional SVG artwork regeneration alone uses scripts/requirements-artwork.txt.
-Linux/macOS: `./setup.sh`, then `.venv/bin/python tools/aim_terminal.py` (USB access rules may
-require OS-specific setup). Windows is the tested command-registration platform.
+Windows development: `setup.ps1 -BuildTools` (no graphical runtime). Linux/macOS: `./setup.sh`, then `.venv/bin/python tools/aim_terminal.py`; USB access may need OS-specific setup, and Windows is the tested command-registration platform. Artwork regeneration alone uses `scripts/requirements-artwork.txt`.
