@@ -966,6 +966,32 @@ static void test_card_layout_and_hidden_ais(const std::filesystem::path& screens
   CHECK(strstr(lv_label_get_text(nova_ui::providers[0].status), " / ") != nullptr);           // window and its reset
   CHECK(!strncmp(lv_label_get_text(nova_ui::providers[0].session), "Updated", 7));            // data age without a session
   check_inside(nova_ui::providers[0].card, nova_ui::providers[0].status); check_readable_text(nova_ui::providers[0].status);
+  // Page dots replace the count text; the age reads grey; cards without a logo show an initial.
+  CHECK(nova_ui::pageCount == 2 && lv_obj_is_hidden(nova_ui::pageLabel));
+  CHECK(!lv_obj_is_hidden(nova_ui::pageDots[0]) && !lv_obj_is_hidden(nova_ui::pageDots[1]) && lv_obj_is_hidden(nova_ui::pageDots[2]));
+  CHECK(lv_obj_get_width(nova_ui::pageDots[nova_ui::page]) == 24 && lv_obj_get_width(nova_ui::pageDots[1 - nova_ui::page]) == 8);
+  CHECK(lv_color_eq(lv_obj_get_style_text_color(nova_ui::providers[0].session, LV_PART_MAIN), lv_color_hex(ui_theme::muted)));
+  for (size_t i = 0; i < 2; ++i) {
+    const auto& item = nova_ui::providers[i];
+    const bool logo = nova_assets::logo_for(item.providerKey, 48) != nullptr;
+    CHECK(!lv_obj_is_hidden(item.logoBox) && lv_obj_is_hidden(item.letter) == logo && lv_obj_is_hidden(item.icon) == !logo);
+    if (!logo) CHECK(strlen(lv_label_get_text(item.letter)) == 1);
+  }
+  // A low window that resets in three days warns in orange; LOCAL becomes a small tag.
+  auto& lowView = sample.views[nova_ui::providers[0].view];
+  for (size_t r = 0; r < lowView.rowCount; ++r) {
+    lowView.rows[r].usedPercent = lowView.showsRemaining ? 5.0f : 95.0f;
+    lowView.rows[r].hasResetCountdown = true; lowView.rows[r].resetSeconds = 3 * 24 * 3600;
+  }
+  keep_quota_fresh(); ui_nova_update();
+  CHECK(lv_color_eq(lv_obj_get_style_text_color(nova_ui::providers[0].status, LV_PART_MAIN), lv_color_hex(0xFFAA00)));
+  sample.views[nova_ui::providers[1].view].informational = true; sample.views[nova_ui::providers[1].view].hasUsage = false;
+  ui_nova_update(); lv_obj_update_layout(nova_ui::screen);
+  CHECK(!strcmp(lv_label_get_text(nova_ui::providers[1].percent), "LOCAL"));
+  CHECK(lv_obj_get_style_text_font(nova_ui::providers[1].percent, LV_PART_MAIN) == &lv_font_montserrat_18);
+  check_inside(nova_ui::providers[1].card, nova_ui::providers[1].percent);
+  lv_obj_set_hidden(quota_banner::banner, true);
+  screenshot(screenshots, "nova-dots-local-warning");
   set_sample(4, 2); keep_quota_fresh();
 
   app_settings::set_card_layout({2, 0xFF});                                      // never an empty display

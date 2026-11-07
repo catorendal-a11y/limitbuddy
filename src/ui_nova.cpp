@@ -90,8 +90,16 @@ struct ProviderCard {
   uint32_t rowColor[3] = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
   uint8_t layout = 0;
   const lv_image_dsc_t* logo = nullptr;
+  lv_obj_t* letter = nullptr;            // provider initial when no logo is bundled
+  bool localStyle = false;               // LOCAL reads as a small tag, not a 40 px value
+  uint32_t sessionColor = UINT32_MAX, statusColor = UINT32_MAX, letterColor = UINT32_MAX;
+  uint32_t rowResetColor[3] = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
 };
 static ProviderCard providers[3];
+// Page dots replace the page count text; the active page is a wider accent pill.
+static lv_obj_t* pageDots[aim::kMaxViews] = {};
+static uint8_t dotsPage = UINT8_MAX, dotsCount = UINT8_MAX;
+static constexpr uint32_t kResetWarning = 0xFFAA00;   // low quota that will not reset within a day
 static lv_obj_t* cardsButton = nullptr;
 static companions::AnimationPlayer animation;
 static uint8_t animatedCompanion=255;
@@ -110,6 +118,14 @@ static uint32_t previousMotion = 0;
 
 static void text(lv_obj_t* label, const char* value) {
   if (strcmp(lv_label_get_text(label), value) != 0) lv_label_set_text(label, value);
+}
+static void text_color(lv_obj_t* label, uint32_t& cache, uint32_t color) {
+  if (cache != color) { cache = color; lv_obj_set_style_text_color(label, lv_color_hex(color), 0); }
+}
+// A low window that resets more than a day from now will run out first; warn on its reset text.
+static bool reset_is_far(const aim::Row& row, float left, const char* key, uint32_t receivedMs, uint32_t now) {
+  return row.hasResetCountdown && (quota_low(left, key, row) || quota_critical(left, key, row)) &&
+         reset_remaining(row, receivedMs, now) > 24u * 3600u;
 }
 static lv_obj_t* label(lv_obj_t* parent, int x, int y, int width, const char* value, const lv_font_t* font, uint32_t color = ui_theme::text) {
   auto* object = lv_label_create(parent); lv_label_set_text(object, value);
@@ -291,6 +307,8 @@ void init() {
     lv_obj_set_style_border_width(logoBox, 1, 0); lv_obj_set_style_pad_all(logoBox, 0, 0);
     lv_obj_set_style_radius(logoBox, 12, 0); lv_obj_set_scrollable(logoBox, false); lv_obj_set_clickable(logoBox, false);
     item.icon = lv_image_create(logoBox); lv_obj_set_clickable(item.icon, false);
+    item.letter = label(logoBox, 0, 0, 46, "", &lv_font_montserrat_24);
+    lv_obj_set_style_text_align(item.letter, LV_TEXT_ALIGN_CENTER, 0); lv_obj_center(item.letter);
     item.name = label(item.card, 62, 4, 174, "", &lv_font_montserrat_22, ui_theme::text);
     item.session = label(item.card, 62, 29, 174, "", &lv_font_montserrat_16, ui_theme::accent);
     item.percent = label(item.card, 242, 0, 170, "--", &lv_font_montserrat_40);
@@ -311,6 +329,12 @@ void init() {
     lv_obj_set_hidden(item.card, true);
   }
   pageLabel = label(screen, 364, 408, 412, "", &lv_font_montserrat_18, ui_theme::muted);
+  for (auto*& dot : pageDots) {
+    dot = lv_obj_create(screen); lv_obj_set_size(dot, 8, 8);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_border_width(dot, 0, 0);
+    lv_obj_set_style_pad_all(dot, 0, 0); lv_obj_set_scrollable(dot, false); lv_obj_set_clickable(dot, false);
+    lv_obj_set_hidden(dot, true);
+  }
   link = label(screen, 24, 410, 316, "Waiting for PC host", &lv_font_montserrat_14, ui_theme::muted);
   ui_navigation::create(screen,ui_navigation::Page::home);
   refreshButton = button(screen, 448, 432, 164, "REFRESH", request_refresh, &refreshLabel);
@@ -325,6 +349,7 @@ static void layout_card(ProviderCard& item, size_t slot, uint8_t mode) {
   const uint8_t id = static_cast<uint8_t>(mode * 4 + slot + 1);
   if (item.layout == id) return;
   item.layout = id;
+  item.localStyle = false;
   const bool full = mode == 1, slim = mode == 3;
   lv_obj_set_pos(item.card, 360, 228 + static_cast<int>(slot) * (slim ? 60 : 90));
   lv_obj_set_size(item.card, 420, full ? 178 : slim ? 58 : 88);
@@ -606,6 +631,19 @@ void update() {
   if (pageCount > 1) snprintf(value, sizeof(value), "Providers / %u of %u", page + 1, pageCount);
   else snprintf(value, sizeof(value), "Tap a provider for all windows");
   text(pageLabel, value);
+  lv_obj_set_hidden(pageLabel, pageCount > 1);
+  if (dotsPage != page || dotsCount != pageCount) {
+    dotsPage = page; dotsCount = pageCount;
+    int x = 368;
+    for (size_t d = 0; d < aim::kMaxViews; ++d) {
+      const bool shown = pageCount > 1 && d < pageCount, active = d == page;
+      lv_obj_set_hidden(pageDots[d], !shown);
+      if (!shown) continue;
+      lv_obj_set_pos(pageDots[d], x, 416); lv_obj_set_width(pageDots[d], active ? 24 : 8);
+      lv_obj_set_style_bg_color(pageDots[d], lv_color_hex(active ? ui_theme::accent : ui_theme::border), 0);
+      x += (active ? 24 : 8) + 8;
+    }
+  }
   for (size_t i = 0; i < 3; ++i) {
     auto& item = providers[i]; const size_t index = page * mode + i;
     const bool visible = i < mode && index < count;
@@ -619,7 +657,12 @@ void update() {
     const auto* brand = nova_assets::logo_for(key, 48);
     if (brand != item.logo) { item.logo = brand; if (brand) lv_image_set_src(item.icon, brand); }
     lv_obj_set_hidden(item.icon, !brand);
-    lv_obj_set_hidden(item.logoBox, !brand);
+    lv_obj_set_hidden(item.letter, brand != nullptr);
+    if (!brand) {
+      const char initial[2] = {static_cast<char>(key[0] >= 'a' && key[0] <= 'z' ? key[0] - 32 : (key[0] ? key[0] : '?')), 0};
+      text(item.letter, initial);
+      text_color(item.letter, item.letterColor, style ? style->color : ui_theme::muted);
+    }
     text(item.name, style ? style->label : key);
     const auto choice = app_settings::nova_window(key);
     const auto* selectedRow = nova_quota_row(view, key, choice);
@@ -630,6 +673,13 @@ void update() {
     const uint32_t color = !fresh ? ui_theme::muted : (quota_critical(remaining, key, row) ? 0xFF5252 :
                             (quota_low(remaining, key, row) ? 0xFFAA00 : (style ? style->color : ui_theme::accent)));
     if (item.color != color) { item.color = color; lv_obj_set_style_bg_color(item.bar, lv_color_hex(color), LV_PART_INDICATOR); }
+    if (item.localStyle != view.informational && mode != 1) {
+      item.localStyle = view.informational;
+      lv_obj_set_style_text_font(item.percent, view.informational ? &lv_font_montserrat_18 :
+                                 (mode == 3 ? &lv_font_montserrat_30 : &lv_font_montserrat_40), 0);
+      lv_obj_set_style_text_color(item.percent, lv_color_hex(view.informational ? ui_theme::muted : ui_theme::text), 0);
+      lv_obj_set_y(item.percent, view.informational ? 8 : (mode == 3 ? 4 : 0));
+    }
     if (view.informational) snprintf(value, sizeof(value), "LOCAL");
     else if (hasRow) format_percent(remaining, true, value, sizeof(value)); else snprintf(value, sizeof(value), "--");
     text(item.percent, value);
@@ -639,6 +689,7 @@ void update() {
     quota_window_label(row.windowMinutes, row.title, period, sizeof(period));
     if (fresh && row.hasResetCountdown) format_countdown(reset_remaining(row, view.quotaReceivedMs, now), reset, sizeof(reset));
     else if (fresh) snprintf(reset, sizeof(reset), "%s", row.resetsShort);
+    const bool farReset = fresh && reset_is_far(row, remaining, key, view.quotaReceivedMs, now);
     snprintf(selectedStatus, sizeof(selectedStatus), "%s%s%s%s", period, choice.automatic ? " / AUTO" : "", reset[0] ? " / " : "", reset);
     const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.informational ? "Activity only / tap for setup" : (view.notice ? "ERROR / last good" :
                           (view.fetching ? "UPDATING / last good" : (!hasRow ? (choice.automatic ? "Waiting for data" : "Selected window unavailable") : (!fresh ? "STALE / last good" : selectedStatus)))));
@@ -668,6 +719,8 @@ void update() {
         if (windowRow.hasResetCountdown) format_countdown(reset_remaining(windowRow, view.quotaReceivedMs, now), line, sizeof(line));
         else snprintf(line, sizeof(line), "%s", windowRow.resetsShort);
         text(item.rowReset[r], line);
+        text_color(item.rowReset[r], item.rowResetColor[r],
+                   live && reset_is_far(windowRow, left, key, view.quotaReceivedMs, now) ? kResetWarning : ui_theme::muted);
         format_percent(left, true, line, sizeof(line)); text(item.rowPercent[r], line);
         const uint32_t rowColor = !live ? ui_theme::muted : (quota_critical(left, key, windowRow) ? 0xFF5252 :
                                   (quota_low(left, key, windowRow) ? 0xFFAA00 : (style ? style->color : ui_theme::accent)));
@@ -683,8 +736,10 @@ void update() {
       else if (live && rows) snprintf(summary, sizeof(summary), age ? "Updated %lu min ago" : "Updated just now", age);
       else snprintf(summary, sizeof(summary), "%s", status);
       text(item.session, summary);
+      text_color(item.session, item.sessionColor, session[0] ? ui_theme::accent : ui_theme::muted);
     } else if (mode == 3) {
       text(item.session, reset);
+      text_color(item.session, item.sessionColor, farReset ? kResetWarning : ui_theme::muted);
     } else {
       // Without a session event the line tells how old the shown quota is.
       char summary[40];
@@ -692,8 +747,10 @@ void update() {
       if (session[0] || !fresh) snprintf(summary, sizeof(summary), "%s", session);
       else snprintf(summary, sizeof(summary), age ? "Updated %lu min ago" : "Updated just now", age);
       text(item.session, summary);
+      text_color(item.session, item.sessionColor, session[0] ? ui_theme::accent : ui_theme::muted);
     }
     text(item.status, status);
+    text_color(item.status, item.statusColor, mode == 2 && farReset ? kResetWarning : ui_theme::muted);
   }
 }
 }  // namespace nova_ui
