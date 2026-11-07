@@ -18,6 +18,7 @@
 #endif
 #include "ui/quota_alert.h"
 #include "ui/quota_window.h"
+#include "ui/usage_format.h"
 #include "ui/quota_headline.h"
 #include "ui/session_hue.h"
 #include "ui/theme.h"
@@ -84,9 +85,14 @@ struct ProviderCard {
   uint8_t view = 0;
   char providerKey[16] = {};
   uint32_t color = UINT32_MAX;
+  // One card on the home screen also lists every window with its reset (rows are hidden otherwise).
+  lv_obj_t *rowTitle[3] = {}, *rowReset[3] = {}, *rowPercent[3] = {}, *rowBar[3] = {};
+  uint32_t rowColor[3] = {UINT32_MAX, UINT32_MAX, UINT32_MAX};
+  uint8_t layout = 0;
   const lv_image_dsc_t* logo = nullptr;
 };
-static ProviderCard providers[2];
+static ProviderCard providers[3];
+static lv_obj_t* cardsButton = nullptr;
 static companions::AnimationPlayer animation;
 static uint8_t animatedCompanion=255;
 static NovaState state;
@@ -255,11 +261,14 @@ void init() {
   lv_obj_set_hidden(shock, true);
   hint = label(stage, 12, 289, 296, "Tap to ping", &lv_font_montserrat_18, ui_theme::muted);
   lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
-  label(screen, 364, 94, 412, "RIGHT NOW", &lv_font_montserrat_18, ui_theme::accent);
+  label(screen, 364, 94, 292, "RIGHT NOW", &lv_font_montserrat_18, ui_theme::accent);
   title = label(screen, 364, 122, 412, "Waiting", &lv_font_montserrat_32);
+  // Choose which AIs the home screen shows and how many cards share it.
+  cardsButton = button(screen, 668, 84, 108, "CARDS", [](lv_event_t*) { ui_settings_open_cards(); });
+  lv_obj_set_height(cardsButton, 40);
   subtitle = label(screen, 364, 165, 412, "Waiting for provider data", &lv_font_montserrat_24, ui_theme::muted);
   tracking = label(screen, 364, 200, 412, "TRACKING / no counters", &lv_font_montserrat_18, ui_theme::muted);
-  for (size_t i = 0; i < 2; ++i) {
+  for (size_t i = 0; i < 3; ++i) {
     auto& item = providers[i];
     item.card = lv_obj_create(screen); lv_obj_set_pos(item.card, 360, 228 + i * 90); lv_obj_set_size(item.card, 420, 88);
     lv_obj_set_style_bg_color(item.card, lv_color_hex(ui_theme::background), 0);
@@ -282,6 +291,16 @@ void init() {
     lv_bar_set_range(item.bar, 0, 100); lv_obj_set_clickable(item.bar, false);
     lv_obj_set_style_bg_color(item.bar, lv_color_hex(ui_theme::border), LV_PART_MAIN);
     item.status = label(item.card, 62, 64, 350, "", &lv_font_montserrat_20, ui_theme::muted);
+    for (size_t r = 0; r < 3; ++r) {
+      item.rowTitle[r] = label(item.card, 8, 0, 150, "", &lv_font_montserrat_18);
+      item.rowReset[r] = label(item.card, 160, 0, 150, "", &lv_font_montserrat_16, ui_theme::muted);
+      item.rowPercent[r] = label(item.card, 300, 0, 112, "", &lv_font_montserrat_24);
+      lv_obj_set_style_text_align(item.rowPercent[r], LV_TEXT_ALIGN_RIGHT, 0);
+      item.rowBar[r] = lv_bar_create(item.card); lv_obj_set_size(item.rowBar[r], 404, 8);
+      lv_bar_set_range(item.rowBar[r], 0, 100); lv_obj_set_clickable(item.rowBar[r], false);
+      lv_obj_set_style_bg_color(item.rowBar[r], lv_color_hex(ui_theme::border), LV_PART_MAIN);
+    }
+    lv_obj_set_hidden(item.card, true);
   }
   pageLabel = label(screen, 364, 408, 412, "", &lv_font_montserrat_18, ui_theme::muted);
   link = label(screen, 24, 410, 316, "Waiting for PC host", &lv_font_montserrat_14, ui_theme::muted);
@@ -292,6 +311,33 @@ void init() {
 
 bool is_active() { return screen && lv_screen_active() == screen; }
 void show() { lv_screen_load(screen); ui_nova_update(); }
+
+// Geometry for one card in each home mode: 1 = all windows, 2 = the classic pair, 3 = slim rows.
+static void layout_card(ProviderCard& item, size_t slot, uint8_t mode) {
+  const uint8_t id = static_cast<uint8_t>(mode * 4 + slot + 1);
+  if (item.layout == id) return;
+  item.layout = id;
+  const bool full = mode == 1, slim = mode == 3;
+  lv_obj_set_pos(item.card, 360, 228 + static_cast<int>(slot) * (slim ? 60 : 90));
+  lv_obj_set_size(item.card, 420, full ? 178 : slim ? 58 : 88);
+  lv_obj_set_y(item.logoBox, full ? 4 : slim ? 5 : 14);
+  lv_obj_set_y(item.name, full || slim ? 2 : 4);
+  lv_obj_set_hidden(item.session, slim);
+  lv_obj_set_y(item.session, full ? 28 : 29);
+  lv_obj_set_width(item.session, full ? 350 : 174);
+  lv_obj_set_hidden(item.percent, full);
+  lv_obj_set_y(item.percent, slim ? 4 : 0);
+  lv_obj_set_style_text_font(item.percent, slim ? &lv_font_montserrat_30 : &lv_font_montserrat_40, 0);
+  lv_obj_set_pos(item.bar, 62, slim ? 40 : 50);
+  lv_obj_set_height(item.bar, slim ? 8 : 10);
+  lv_obj_set_hidden(item.status, full || slim);
+  for (size_t r = 0; r < 3; ++r) {
+    const int y = 58 + static_cast<int>(r) * 40;
+    lv_obj_set_y(item.rowTitle[r], y); lv_obj_set_y(item.rowReset[r], y + 2);
+    lv_obj_set_y(item.rowPercent[r], y - 4); lv_obj_set_pos(item.rowBar[r], 8, y + 24);
+    for (auto* object : {item.rowTitle[r], item.rowReset[r], item.rowPercent[r], item.rowBar[r]}) lv_obj_set_hidden(object, !full);
+  }
+}
 
 void update() {
   companions::runtime::ui_tick(detach_external);
@@ -522,18 +568,27 @@ void update() {
                    !snapshot.hostPresent || !snapshot.manualRefreshSupported || busy);
   // Keep pair selection and visible provider targets stable until release.
   for (const auto& item : providers) if (lv_obj_has_state(item.card, LV_STATE_PRESSED)) return;
+  if (lv_obj_has_state(cardsButton, LV_STATE_PRESSED)) return;
   if (lv_obj_has_state(nextButton, LV_STATE_PRESSED)) return;
   uint8_t indices[aim::kMaxViews]; size_t count = 0;
   for (size_t v = 0; v < aim::kMaxViews; ++v) {
     if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;
     if (snapshot.views[v].valid || (snapshot.viewsConfigured && snapshot.viewKeys[v][0])) indices[count++] = v;
   }
-  pageCount = static_cast<uint8_t>(count ? (count + 1) / 2 : 1);
+  // AIs hidden in CARDS stay off this screen too, unless every one of them is hidden.
+  size_t shown = 0;
+  for (size_t k = 0; k < count; ++k) {
+    const char* key = snapshot.viewKeys[indices[k]][0] ? snapshot.viewKeys[indices[k]] : snapshot.views[indices[k]].providerKey;
+    if (!app_settings::provider_hidden(key)) indices[shown++] = indices[k];
+  }
+  if (shown) count = shown;
+  const uint8_t mode = app_settings::card_layout().homeCards;
+  pageCount = static_cast<uint8_t>(count ? (count + mode - 1) / mode : 1);
   if (lastRevision != snapshot.viewRevision) {
     lastRevision = snapshot.viewRevision;
     size_t position = 0;  // activeView is a raw slot; map it into the compacted indices.
     for (size_t k = 0; k < count; ++k) if (indices[k] == snapshot.activeView) { position = k; break; }
-    page = static_cast<uint8_t>(position / 2 % pageCount);
+    page = static_cast<uint8_t>(position / mode % pageCount);
   }
   page %= pageCount;
   lv_obj_set_state(nextButton, LV_STATE_DISABLED, pageCount < 2);
@@ -541,10 +596,12 @@ void update() {
   if (pageCount > 1) snprintf(value, sizeof(value), "Providers / %u of %u", page + 1, pageCount);
   else snprintf(value, sizeof(value), "Tap a provider for all windows");
   text(pageLabel, value);
-  for (size_t i = 0; i < 2; ++i) {
-    auto& item = providers[i]; const size_t index = page * 2 + i;
-    lv_obj_set_hidden(item.card, index >= count);
-    if (index >= count) continue;
+  for (size_t i = 0; i < 3; ++i) {
+    auto& item = providers[i]; const size_t index = page * mode + i;
+    const bool visible = i < mode && index < count;
+    lv_obj_set_hidden(item.card, !visible);
+    if (!visible) continue;
+    layout_card(item, i, mode);
     item.view = indices[index]; const auto& view = snapshot.views[item.view];
     const char* key = view.valid ? view.providerKey : snapshot.viewKeys[item.view];
     snprintf(item.providerKey, sizeof(item.providerKey), "%s", key);
@@ -566,7 +623,7 @@ void update() {
     if (view.informational) snprintf(value, sizeof(value), "LOCAL");
     else if (hasRow) format_percent(remaining, true, value, sizeof(value)); else snprintf(value, sizeof(value), "--");
     text(item.percent, value);
-    lv_obj_set_hidden(item.bar, view.informational || !hasRow);  // an empty track would read as 0%
+    lv_obj_set_hidden(item.bar, mode == 1 || view.informational || !hasRow);  // empty track reads as 0%; one card has its own rows
     if (lv_bar_get_value(item.bar) != static_cast<int32_t>(remaining)) lv_bar_set_value(item.bar, remaining, LV_ANIM_OFF);
     char period[48], selectedStatus[64];
     quota_window_label(row.windowMinutes, row.title, period, sizeof(period));
@@ -583,7 +640,40 @@ void update() {
       else if (provider_sessions.error) session = "Session: error";
       else if (provider_sessions.completed) session = "Session: complete";
     }
-    text(item.session, session);
+    if (mode == 1) {
+      // Every reported window with its reset, plus the session or the data's state on one line.
+      const size_t rows = view.informational ? 0 : std::min<size_t>(view.rowCount, 3);
+      const bool live = !view.notice && !view.fetching && snapshot.hostPresent && now - view.quotaReceivedMs < aim::kQuotaStaleMs;
+      for (size_t r = 0; r < 3; ++r) {
+        const bool show = r < rows && view.rows[r].valid;
+        for (auto* object : {item.rowTitle[r], item.rowReset[r], item.rowPercent[r], item.rowBar[r]})
+          if (lv_obj_is_hidden(object) == show) lv_obj_set_hidden(object, !show);
+        if (!show) continue;
+        const auto& windowRow = view.rows[r];
+        const float left = view.showsRemaining ? windowRow.usedPercent : 100.0f - windowRow.usedPercent;
+        char line[48];
+        quota_window_label(windowRow.windowMinutes, windowRow.title, line, sizeof(line)); text(item.rowTitle[r], line);
+        if (windowRow.hasResetCountdown) format_countdown(reset_remaining(windowRow, view.quotaReceivedMs, now), line, sizeof(line));
+        else snprintf(line, sizeof(line), "%s", windowRow.resetsShort);
+        text(item.rowReset[r], line);
+        format_percent(left, true, line, sizeof(line)); text(item.rowPercent[r], line);
+        const uint32_t rowColor = !live ? ui_theme::muted : (quota_critical(left, key, windowRow) ? 0xFF5252 :
+                                  (quota_low(left, key, windowRow) ? 0xFFAA00 : (style ? style->color : ui_theme::accent)));
+        if (item.rowColor[r] != rowColor) {
+          item.rowColor[r] = rowColor; lv_obj_set_style_bg_color(item.rowBar[r], lv_color_hex(rowColor), LV_PART_INDICATOR);
+        }
+        const int32_t barValue = static_cast<int32_t>(std::clamp(left, 0.0f, 100.0f));
+        if (lv_bar_get_value(item.rowBar[r]) != barValue) lv_bar_set_value(item.rowBar[r], barValue, LV_ANIM_OFF);
+      }
+      char summary[64];
+      const unsigned long age = (now - view.quotaReceivedMs) / 60000u;
+      if (session[0]) snprintf(summary, sizeof(summary), "%s", session);
+      else if (live && rows) snprintf(summary, sizeof(summary), age ? "Updated %lu min ago" : "Updated just now", age);
+      else snprintf(summary, sizeof(summary), "%s", status);
+      text(item.session, summary);
+    } else {
+      text(item.session, session);
+    }
     text(item.status, status);
   }
 }

@@ -6,3 +6,4 @@ void ui_settings_update();
 void ui_settings_show();   // load the settings screen
 void ui_settings_hide();   // return to the dashboard screen
 bool ui_settings_is_active();
+void ui_settings_open_cards();  // open CARDS directly; DONE returns to the calling screen

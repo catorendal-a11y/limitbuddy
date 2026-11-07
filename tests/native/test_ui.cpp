@@ -97,6 +97,16 @@ void set_nova_window(const char* provider, NovaWindow value) {
   testNovaWindows[provider] = value; report_save(testNovaSaveSuccess);
 }
 void set_appearance(Appearance value) { testAppearance = normalize_appearance(value); report_save(true); }
+static CardLayout testCards;
+CardLayout card_layout() { return testCards; }
+void set_card_layout(CardLayout value) {
+  value.perPage = normalize_cards_per_page(value.perPage); value.homeCards = normalize_home_cards(value.homeCards);
+  testCards = value; report_save(true);
+}
+bool provider_hidden(const char* provider) {
+  for (size_t i = 0; i < 8; ++i) if (provider && strcmp(provider, nova_window_keys[i]) == 0) return testCards.hidden >> i & 1u;
+  return false;
+}
 bool take_initial_brightness(uint8_t& value) {
   if (!testInitialBrightnessPending) return false;
   testInitialBrightnessPending = false;
@@ -882,6 +892,82 @@ static void test_pace_marker_and_urgent_dial(const std::filesystem::path& screen
   sample.hostPresent = false; ui_nova_update();
   CHECK(lv_obj_is_hidden(nova_ui::dial));                                      // no host, no ring
   dashboard_show();
+}
+
+// The user chooses one, two or four cards per page and which AIs to show; hiding all shows all.
+static void test_card_layout_and_hidden_ais(const std::filesystem::path& screenshots) {
+  set_sample(4, 2); keep_quota_fresh();
+  app_settings::set_card_layout({4, 0});
+  dashboard_show(); dashboard_update();
+  for (const auto& card : compact) { CHECK(!lv_obj_is_hidden(card.card)); check_inside(dashboardScreen, card.card); }
+  for (const auto& card : big) CHECK(lv_obj_is_hidden(card.card));
+  CHECK(lv_obj_is_hidden(pageButton));                                          // four AIs fit one page
+  CHECK(!strcmp(compact[3].providerKey, "gemini"));
+  lv_obj_set_hidden(quota_banner::banner, true);
+  screenshot(screenshots, "dashboard-four-cards");
+
+  app_settings::set_card_layout({1, 0}); dashboard_update();
+  CHECK(!lv_obj_is_hidden(big[0].card) && lv_obj_is_hidden(big[1].card));
+  CHECK(lv_obj_get_style_x(big[0].card, LV_PART_MAIN) == 214);                 // one card sits centred
+  for (const auto& card : compact) CHECK(lv_obj_is_hidden(card.card));
+  CHECK(!lv_obj_is_hidden(pageButton) && !strcmp(lv_label_get_text(pageLabel), "1 / 4 >"));
+
+  app_settings::set_card_layout({2, 1u << 0});                                   // hide Codex (bit 0)
+  dashboard_update();
+  CHECK(lv_obj_get_style_x(big[0].card, LV_PART_MAIN) == 20);
+  CHECK(!strcmp(big[0].providerKey, "zcode") && !strcmp(big[1].providerKey, "claude"));
+  CHECK(!strcmp(lv_label_get_text(pageLabel), "1 / 2 >"));                     // three shown AIs, two per page
+  ui_nova_show(); ui_nova_update();
+  CHECK(!strcmp(nova_ui::providers[0].providerKey, "zcode"));                  // the companion screen agrees
+
+  // Home: one card lists every window with its reset; three slim cards share a page.
+  set_sample(4, 3); keep_quota_fresh();
+  sample.views[0].rows[0].hasResetCountdown = true; sample.views[0].rows[0].resetSeconds = 75 * 60;
+  app_settings::set_card_layout({2, 0, 1}); ui_nova_show(); ui_nova_update(); lv_obj_update_layout(nova_ui::screen);
+  auto& rich = nova_ui::providers[0];
+  CHECK(!lv_obj_is_hidden(rich.card) && lv_obj_is_hidden(nova_ui::providers[1].card) && lv_obj_is_hidden(nova_ui::providers[2].card));
+  CHECK(lv_obj_get_height(rich.card) == 178 && lv_obj_is_hidden(rich.percent) && lv_obj_is_hidden(rich.bar));
+  for (size_t r = 0; r < 3; ++r) {
+    CHECK(!lv_obj_is_hidden(rich.rowTitle[r]) && !lv_obj_is_hidden(rich.rowBar[r]));
+    check_inside(rich.card, rich.rowBar[r]); check_readable_text(rich.rowTitle[r]); check_readable_text(rich.rowPercent[r]);
+  }
+  CHECK(!strcmp(lv_label_get_text(rich.rowPercent[0]), "75%") && strlen(lv_label_get_text(rich.rowReset[0])) > 0);
+  CHECK(!strcmp(lv_label_get_text(nova_ui::pageLabel), "Providers / 1 of 4"));
+  lv_obj_set_hidden(quota_banner::banner, true);
+  screenshot(screenshots, "nova-one-card");
+  app_settings::set_card_layout({2, 0, 3}); ui_nova_update(); lv_obj_update_layout(nova_ui::screen);
+  for (const auto& item : nova_ui::providers) { CHECK(!lv_obj_is_hidden(item.card)); CHECK(lv_obj_get_height(item.card) == 58); }
+  CHECK(!lv_obj_is_hidden(nova_ui::providers[2].bar) && lv_obj_is_hidden(nova_ui::providers[2].status));
+  CHECK(!strcmp(lv_label_get_text(nova_ui::pageLabel), "Providers / 1 of 2"));
+  lv_obj_set_hidden(quota_banner::banner, true);
+  screenshot(screenshots, "nova-three-cards");
+  lv_obj_send_event(nova_ui::cardsButton, LV_EVENT_CLICKED, nullptr);            // CARDS on home opens the panel
+  CHECK(ui_settings_is_active() && !lv_obj_is_hidden(cardsOverlay));
+  close_cards(nullptr);
+  CHECK(lv_screen_active() == nova_ui::screen);                                  // DONE returns home
+  app_settings::set_card_layout({2, 1u << 0, 2}); ui_nova_update(); lv_obj_update_layout(nova_ui::screen);
+  CHECK(lv_obj_get_height(nova_ui::providers[0].card) == 88 && !lv_obj_is_hidden(nova_ui::providers[0].percent));
+  set_sample(4, 2); keep_quota_fresh();
+
+  app_settings::set_card_layout({2, 0xFF});                                      // never an empty display
+  dashboard_show(); dashboard_update();
+  CHECK(!strcmp(big[0].providerKey, "codex"));
+
+  app_settings::set_card_layout({2, 1u << 0});
+  ui_settings_show(); open_cards(nullptr);
+  CHECK(!lv_obj_is_hidden(cardsOverlay) && cardProviderCount == 4);
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(cardProviderButtons[0], LV_PART_MAIN), lv_color_hex(ui_theme::button)));   // hidden
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(cardProviderButtons[1], LV_PART_MAIN), lv_color_hex(ui_theme::accent)));   // shown
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(perPageButtons[1], LV_PART_MAIN), lv_color_hex(ui_theme::accent)));        // 2 LARGE
+  for (auto* button : cardProviderButtons) if (!lv_obj_is_hidden(button)) check_readable_text(lv_obj_get_child(button, 0));
+  screenshot(screenshots, "settings-cards");
+  lv_obj_send_event(cardProviderButtons[0], LV_EVENT_CLICKED, nullptr);        // show Codex again
+  CHECK(app_settings::card_layout().hidden == 0);
+  lv_obj_send_event(perPageButtons[2], LV_EVENT_CLICKED, nullptr);
+  CHECK(app_settings::card_layout().perPage == 4);
+  close_cards(nullptr); ui_settings_hide();
+  app_settings::set_card_layout({});
+  dashboard_show(); dashboard_update();
 }
 
 // The header names the most urgent window over every AI, including cards on another page.
@@ -1858,6 +1944,7 @@ int main(int argc, char** argv) {
   test_reported_session_poses(screenshots);
   test_critical_alert_wakes_dimmed_screen();
   test_pace_marker_and_urgent_dial(screenshots);
+  test_card_layout_and_hidden_ais(screenshots);
   test_avatar_extras(screenshots);
   test_header_headline(screenshots);
   test_status_line_is_readable(screenshots);
@@ -2393,7 +2480,7 @@ int main(int argc, char** argv) {
       for(uint32_t i=0;i<lv_obj_get_child_count(root);++i)count+=self(self,lv_obj_get_child(root,i));
       return count;
     };
-    CHECK(buttonCount(buttonCount,nova_ui::screen)==5);
+    CHECK(buttonCount(buttonCount,nova_ui::screen)==6);   // nav x3, REFRESH, NEXT, CARDS
     check_inside(nova_ui::screen,nova_ui::refreshButton);
     check_readable_text(nova_ui::refreshLabel);
     lv_area_t refreshBounds;lv_obj_get_coords(nova_ui::refreshButton,&refreshBounds);

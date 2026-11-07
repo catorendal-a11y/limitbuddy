@@ -49,6 +49,15 @@ inline constexpr const char* nova_window_keys[] = {
 };
 NovaWindow nova_window(const char* provider);
 void set_nova_window(const char* provider, NovaWindow value);
+// Usage cards: how many share a page, and which AIs the display hides (bit i = nova_window_keys[i]).
+// Hidden AIs still raise alerts; when every shown AI is hidden the display shows them all.
+// homeCards: provider cards on the home screen (1 shows every window, 2 or 3 show one each).
+struct CardLayout { uint8_t perPage = 2; uint8_t hidden = 0; uint8_t homeCards = 2; };
+constexpr uint8_t normalize_cards_per_page(uint8_t value) { return value == 1 || value == 2 || value == 4 ? value : 2; }
+constexpr uint8_t normalize_home_cards(uint8_t value) { return value >= 1 && value <= 3 ? value : 2; }
+CardLayout card_layout();
+void set_card_layout(CardLayout value);
+bool provider_hidden(const char* provider);
 inline const char* companion_name(Companion value) {
   return value == Companion::orbit ? "ORBIT" : value == Companion::claude ? "CLAUDE" :
          value == Companion::wraith ? "WRAITH" : value == Companion::glitch ? "GLITCH" : "NOVA";

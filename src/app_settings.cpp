@@ -30,6 +30,7 @@ static NightSettings s_savedNight;
 static Appearance s_appearance, s_savedAppearance;
 static constexpr size_t kNovaWindowBytes = 8 * 41;
 static NovaWindow s_novaWindows[8], s_savedNovaWindows[8];
+static CardLayout s_cards, s_savedCards;
 static int nova_provider_index(const char* key) {
   if (!key) return -1;
   for (size_t i = 0; i < 8; ++i) if (strcmp(key, nova_window_keys[i]) == 0) return static_cast<int>(i);
@@ -148,6 +149,10 @@ static bool ensure_loaded(bool retry = false) {
     memcpy(value.title, cell + 5, 36);
     if (valid_nova_window(value)) novaWindows[i] = value;
   }
+  uint8_t cards[3]{};
+  CardLayout cardLayout;
+  if (!read_blob("cards_v1", cards, sizeof(cards), present)) return failed();
+  if (present) cardLayout = {normalize_cards_per_page(cards[0]), cards[1], normalize_home_cards(cards[2])};
   prefs.end();
 
   s_brightness = brightness; s_dimMinutes = dim; s_warningPercent = warning;
@@ -157,6 +162,7 @@ static bool ensure_loaded(bool retry = false) {
   s_savedBrightness = s_brightness;
   s_savedDim = s_dimMinutes; s_savedWarning = s_warningPercent; s_savedNight = s_night;
   s_savedAppearance = s_appearance;
+  s_cards = s_savedCards = cardLayout;
   memcpy(s_savedNovaWindows, s_novaWindows, sizeof(s_novaWindows));
   memcpy(s_savedRules, s_rules, sizeof(s_rules));
   s_loadFailed = false;
@@ -210,6 +216,23 @@ void set_nova_window(const char* provider, NovaWindow value) {
     saved = prefs.putBytes("nova_win_v1", bytes, sizeof(bytes)) == sizeof(bytes); prefs.end();
   }
   if (saved) memcpy(s_savedNovaWindows, s_novaWindows, sizeof(s_novaWindows));
+  report_save(saved);
+}
+CardLayout card_layout() { ensure_loaded(); return s_cards; }
+bool provider_hidden(const char* provider) {
+  ensure_loaded(); const int index = nova_provider_index(provider);
+  return index >= 0 && (s_cards.hidden >> index & 1u);
+}
+void set_card_layout(CardLayout value) {
+  if (!ensure_loaded(true)) { report_save(false); return; }
+  value.perPage = normalize_cards_per_page(value.perPage); value.homeCards = normalize_home_cards(value.homeCards); s_cards = value;
+  if (value.perPage == s_savedCards.perPage && value.hidden == s_savedCards.hidden && value.homeCards == s_savedCards.homeCards) {
+    report_save(true); return;
+  }
+  const uint8_t bytes[] = {value.perPage, value.hidden, value.homeCards};
+  Preferences prefs; bool saved = false;
+  if (prefs.begin(NVS_NAMESPACE, false)) { saved = prefs.putBytes("cards_v1", bytes, sizeof(bytes)) == sizeof(bytes); prefs.end(); }
+  if (saved) s_savedCards = value;
   report_save(saved);
 }
 void set_appearance(Appearance value) {

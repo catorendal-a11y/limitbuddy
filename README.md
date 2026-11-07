@@ -47,6 +47,14 @@ The PC does the reading. The display only receives numbers over USB. LimitBuddy 
 > [!TIP]
 > The white marker shows where an even burn would be by now. If the "left" bar is shorter than the marker, you are using quota faster than the window allows. Amber and red edges mean the quota is low or critical. See [what each mark means](docs/QUICK_START.md#reading-the-display).
 
+### Choose what you see
+
+| One AI on home | Three AIs on home | CARDS settings |
+| :---: | :---: | :---: |
+| ![One home card with every window, reset and session](docs/ui/nova-one-card.png) | ![Three slim home cards](docs/ui/nova-three-cards.png) | ![Show or hide each AI; 1-3 home cards, 1, 2 or 4 usage cards](docs/ui/settings-cards.png) |
+
+Tap **CARDS** on the home screen to hide AIs and pick **1, 2 or 3** home cards. One card shows every window with its reset and the session. The USAGE page takes **1, 2 or 4** cards ([four compact cards](docs/ui/dashboard-four-cards.png)). Hidden AIs still raise alerts.
+
 ## Supported AI tools
 
 | Tool | Activity | Quota (5 h / 7 d) | What you need |

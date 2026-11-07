@@ -4,7 +4,8 @@
 //   button; two cards with provider-colored spine, letter badge, vendor meta,
 //   "REMAINING" column, window meta rows, 30 px percentages with LEFT unit,
 //   pill bars with light end-knob; system bar footer.
-// Always show two full-size provider cards; extra providers use pages rather than tiny grids.
+// Two full-size cards per page by default; the user may choose one card, or four compact cards,
+// and hide AIs (MENU > SETTINGS > CARDS). Extra providers use pages.
 
 #include "dashboard.h"
 
@@ -32,6 +33,7 @@
 #include "ui/nova_assets.h"
 #include "ui_settings.h"
 #include "ui_menu.h"
+#include "app_settings.h"
 
 // ───────────────────────────────────────────────────────────────────────────────
 // V2 PALETTE (from the SVG)
@@ -70,7 +72,8 @@ static const uint32_t C_AMBER = 0xFFAA00;
 #define F_PCT &lv_font_montserrat_30
 #define F_BADGE &lv_font_montserrat_22
 
-static constexpr size_t kBigCards = 2;       // side-by-side (<= 2 providers)
+static constexpr size_t kBigCards = 2;       // side-by-side full-size cards
+static constexpr size_t kCompactCards = 4;   // 2 x 2 grid when the user picks four per page
 static constexpr uint32_t STALE_MS = aim::kQuotaStaleMs;
 
 // Per-provider v2 styling: brand base, light knob tint, badge colors, vendor.
@@ -153,6 +156,7 @@ struct HeaderWidgets {
 
 static HeaderWidgets hdr;
 static CardWidgets big[kBigCards];
+static CardWidgets compact[kCompactCards];
 static lv_obj_t* footDot = nullptr;
 static lv_obj_t* footStrong = nullptr;
 static lv_obj_t* footFrames = nullptr;
@@ -198,6 +202,7 @@ struct CardCaches {
 };
 
 static CardCaches bigCache[kBigCards];
+static CardCaches compactCache[kCompactCards];
 static char liveCache[12] = {0};
 static char clockCache[8] = {0};
 static char titleCache[64] = {0};
@@ -214,8 +219,8 @@ static lv_obj_t* pageLabel = nullptr;
 static uint8_t currentPage = 0, pageCount = 1;
 static uint32_t lastPageMs = 0, viewRevision = UINT32_MAX;
 // bar value/color cache slots: stable index per (layout, card, row)
-static float g_barValue[kBigCards][aim::kMaxRows];
-static uint32_t g_barColor[kBigCards][aim::kMaxRows];
+static float g_barValue[kBigCards + kCompactCards][aim::kMaxRows];
+static uint32_t g_barColor[kBigCards + kCompactCards][aim::kMaxRows];
 
 static void set_label_cached(lv_obj_t* lbl, char* cache, size_t cap, const char* text) {
   if (!lbl || (strncmp(cache, text, cap) == 0 && strcmp(lv_label_get_text(lbl), cache) == 0)) return;
@@ -439,6 +444,65 @@ static CardWidgets build_big_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) 
   return c;
 }
 
+// Quarter-height card for the 2 x 2 layout: name, one line per window, no captions or markers.
+static CardWidgets build_compact_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) {
+  CardWidgets c;
+  c.compact = true;
+  c.card = lv_obj_create(parent);
+  lv_obj_set_size(c.card, 372, 150);
+  lv_obj_set_pos(c.card, x, y);
+  lv_obj_set_style_bg_color(c.card, lv_color_hex(C_CARD), 0);
+  lv_obj_set_style_bg_opa(c.card, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(c.card, lv_color_hex(C_LINE), 0);
+  lv_obj_set_style_border_width(c.card, 1, 0);
+  lv_obj_set_style_radius(c.card, 18, 0);
+  lv_obj_set_style_shadow_width(c.card, 0, 0);
+  lv_obj_set_style_pad_all(c.card, 0, 0);
+  lv_obj_set_scrollable(c.card, false);
+  lv_obj_set_hidden(c.card, true);
+  c.spine = make_dot(c.card, 0, 0, 4, C_GREEN);
+  lv_obj_set_size(c.spine, 4, 150);
+  lv_obj_set_style_radius(c.spine, 2, 0);
+  c.badge = lv_obj_create(c.card);
+  lv_obj_set_pos(c.badge, 14, 10);
+  lv_obj_set_size(c.badge, 28, 28);
+  lv_obj_set_style_radius(c.badge, 8, 0);
+  lv_obj_set_style_pad_all(c.badge, 0, 0);
+  lv_obj_set_style_border_width(c.badge, 1, 0);
+  lv_obj_set_scrollable(c.badge, false);
+  lv_obj_set_clickable(c.badge, false);
+  c.badgeLogo = lv_image_create(c.badge);
+  lv_obj_set_pos(c.badgeLogo, 1, 1);
+  lv_obj_set_clickable(c.badgeLogo, false);
+  c.badgeLetter = make_label(c.badge, 0, 0, 26, F_META, C_NAME, LV_TEXT_ALIGN_CENTER, "-");
+  lv_obj_center(c.badgeLetter);
+  c.name = make_label(c.card, 50, 10, 190, F_PROVIDER, C_NAME, LV_TEXT_ALIGN_LEFT, "-");
+  c.vendor = make_label(c.card, 16, 42, 340, &lv_font_montserrat_14, C_META, LV_TEXT_ALIGN_LEFT, "");
+  lv_label_set_long_mode(c.vendor, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_style_text_letter_space(c.vendor, 1, 0);
+  c.remaining = make_label(c.card, 240, 14, 106, F_META, C_META, LV_TEXT_ALIGN_RIGHT, "REMAINING");
+  lv_obj_set_style_text_letter_space(c.remaining, 1, 0);
+  for (size_t r = 0; r < aim::kMaxRows; ++r) {
+    RowWidgets& w = c.rows[r];
+    const lv_coord_t ry = static_cast<lv_coord_t>(64 + r * 30);
+    w.name = make_label(c.card, 16, ry, 96, F_META, C_ROWLABEL, LV_TEXT_ALIGN_LEFT, "");
+    w.pct = make_label(c.card, 260, ry - 1, 86, &lv_font_montserrat_16, C_PCT, LV_TEXT_ALIGN_RIGHT, "--");
+    w.bar = lv_bar_create(c.card);
+    lv_obj_set_size(w.bar, 330, 5);
+    lv_obj_set_pos(w.bar, 16, ry + 20);
+    lv_bar_set_range(w.bar, 0, 100);
+    lv_obj_set_style_bg_color(w.bar, lv_color_hex(C_BAR_TRACK), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(w.bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(w.bar, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(w.bar, 4, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(w.bar, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(w.bar, 4, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(w.bar, LV_OPA_COVER, LV_PART_INDICATOR);
+    w.reset = make_label(c.card, 116, ry, 136, F_META, C_RESET, LV_TEXT_ALIGN_RIGHT, "");
+  }
+  return c;
+}
+
 // ───────────────────────────────────────────────────────────────────────────────
 // BUILD
 // ───────────────────────────────────────────────────────────────────────────────
@@ -522,12 +586,17 @@ void dashboard_init() {
 
   // ── cards ──
   for (size_t i = 0; i < kBigCards; ++i) big[i] = build_big_card(scr, (lv_coord_t)(20 + i * 388), 96);
-  for (auto& card : big) {
+  static const lv_coord_t kCompactX[kCompactCards] = {20, 408, 20, 408};
+  static const lv_coord_t kCompactY[kCompactCards] = {96, 96, 258, 258};
+  for (size_t i = 0; i < kCompactCards; ++i) compact[i] = build_compact_card(scr, kCompactX[i], kCompactY[i]);
+  auto attach = [](CardWidgets& card) {
     lv_obj_set_clickable(card.card, true);
     lv_obj_add_event_cb(card.card, open_card_cb, LV_EVENT_CLICKED, &card);
     ui_interaction::keep_target(card.card);
-    for (auto& row : card.rows) lv_obj_set_clickable(row.bar, false);
-  }
+    for (auto& row : card.rows) if (row.bar) lv_obj_set_clickable(row.bar, false);
+  };
+  for (auto& card : big) attach(card);
+  for (auto& card : compact) attach(card);
   hintLabel = make_label(scr, 0, 230, 800, F_ROWLABEL, C_META, LV_TEXT_ALIGN_CENTER, "");
 
   // ── system bar footer (0,432,800,48) ──
@@ -569,6 +638,7 @@ void dashboard_init() {
   lv_obj_set_state(pageButton, LV_STATE_DISABLED, true);
 
   for (auto& cache : bigCache) cache = CardCaches{};
+  for (auto& cache : compactCache) cache = CardCaches{};
   memset(g_barValue, 0, sizeof(g_barValue));
   memset(g_barColor, 0, sizeof(g_barColor));
   liveCache[0] = clockCache[0] = titleCache[0] = '\0';
@@ -808,6 +878,7 @@ void dashboard_update() {
   // Do not move, hide or rebind an active touch target. Release activation
   // resolves the saved provider identity against the newest snapshot.
   for (const auto& card : big) if (lv_obj_has_state(card.card, LV_STATE_PRESSED)) return;
+  for (const auto& card : compact) if (lv_obj_has_state(card.card, LV_STATE_PRESSED)) return;
   if (lv_obj_has_state(pageButton, LV_STATE_PRESSED)) return;
   const aim::Snapshot snap = aim::read();
   const uint32_t now = millis();
@@ -899,14 +970,20 @@ void dashboard_update() {
     entries[used].key = snap.viewKeys[v];
     used++;
   }
+  // Drop AIs the user hid, unless that would leave the page empty.
+  size_t shown = 0;
+  for (size_t k = 0; k < used; ++k)
+    if (!app_settings::provider_hidden(entries[k].key[0] ? entries[k].key : entries[k].view->providerKey)) entries[shown++] = entries[k];
+  if (shown) used = shown;
+  const size_t perPage = app_settings::card_layout().perPage;
 
-  pageCount = static_cast<uint8_t>(std::max<size_t>(1, (used + kBigCards - 1) / kBigCards));
+  pageCount = static_cast<uint8_t>(std::max<size_t>(1, (used + perPage - 1) / perPage));
   if (viewRevision != snap.viewRevision) {
     viewRevision = snap.viewRevision;
     // activeView is a raw slot; skipped slots shift the compacted entries.
     size_t position = 0;
     for (size_t k = 0; k < used; ++k) if (entries[k].index == snap.activeView) { position = k; break; }
-    currentPage = static_cast<uint8_t>((position / kBigCards) % pageCount);
+    currentPage = static_cast<uint8_t>((position / perPage) % pageCount);
     lastPageMs = now;
   }
   currentPage %= pageCount;
@@ -922,18 +999,24 @@ void dashboard_update() {
     snprintf(text, sizeof(text), "%u / %u >", currentPage + 1u, pageCount);
     if (strcmp(lv_label_get_text(pageLabel), text) != 0) lv_label_set_text(pageLabel, text);
   }
-  const size_t start = currentPage * kBigCards;
-  const size_t onPage = std::min(kBigCards, used - std::min(start, used));
-
-  for(size_t i=0;i<kBigCards;++i) {
-    auto& card=big[i];
-    lv_obj_set_hidden(card.card,i>=onPage);
-    if(i>=onPage)continue;
-    const auto& entry=entries[start+i];
-    card.viewIndex=entry.index;
-    snprintf(card.providerKey,sizeof(card.providerKey),"%s",entry.key[0]?entry.key:entry.view->providerKey);
-    render_card(card,bigCache[i],entry.view,entry.key,i,now,snap.hostPresent,
-        session_status(snap,now,entry.key,agentEvents,liveAgents));
+  const size_t start = currentPage * perPage;
+  const size_t onPage = std::min(perPage, used - std::min(start, used));
+  const bool useCompact = perPage == kCompactCards;
+  // One card per page sits centred; two use the left and right columns.
+  const lv_coord_t firstX = perPage == 1 ? 214 : 20;
+  if (lv_obj_get_style_x(big[0].card, LV_PART_MAIN) != firstX) lv_obj_set_x(big[0].card, firstX);
+  for (size_t i = 0; i < kBigCards + kCompactCards; ++i) {
+    const bool isCompact = i >= kBigCards;
+    const size_t slot = isCompact ? i - kBigCards : i;
+    auto& card = isCompact ? compact[slot] : big[slot];
+    const bool show = isCompact == useCompact && slot < onPage;
+    lv_obj_set_hidden(card.card, !show);
+    if (!show) continue;
+    const auto& entry = entries[start + slot];
+    card.viewIndex = entry.index;
+    snprintf(card.providerKey, sizeof(card.providerKey), "%s", entry.key[0] ? entry.key : entry.view->providerKey);
+    render_card(card, isCompact ? compactCache[slot] : bigCache[slot], entry.view, entry.key, i, now, snap.hostPresent,
+                session_status(snap, now, entry.key, agentEvents, liveAgents));
   }
 
   char hintBuf[96];

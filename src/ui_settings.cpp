@@ -46,6 +46,13 @@ static lv_obj_t *quotaButtons[4] = {}, *quotaCaptions[4] = {}, *quotaPrev = null
 static char quotaProviders[8][16] = {};
 static uint8_t quotaProviderCount = 0, quotaProviderIndex = 0, quotaChoiceCount = 0;
 static app_settings::NovaWindow quotaChoices[3];
+static lv_obj_t *cardsOverlay = nullptr, *cardsEmpty = nullptr;
+static lv_obj_t *cardProviderButtons[8] = {}, *cardProviderCaptions[8] = {}, *perPageButtons[3] = {}, *perPageCaptions[3] = {};
+static lv_obj_t *homeCardButtons[3] = {}, *homeCardCaptions[3] = {};
+static bool cardsReturnOnDone = false;
+static char cardProviders[8][16] = {};
+static uint8_t cardProviderCount = 0;
+static const uint8_t kPerPageChoices[] = {1, 2, 4};
 static const uint8_t kDimChoices[] = {0, 1, 5, 10};
 static const uint8_t kBrightnessPresets[] = {25, 50, 75, 100};
 static uint8_t lastDimChoice = 255, lastPresetValue = 255;
@@ -53,7 +60,7 @@ static uint8_t brightnessBeforeDrag = 0;
 static bool brightnessDragging = false;
 
 static void close_overlays() {
-  for (auto* overlay : {alertsOverlay, nightOverlay, appearanceOverlay, quotaOverlay})
+  for (auto* overlay : {alertsOverlay, nightOverlay, appearanceOverlay, quotaOverlay, cardsOverlay})
     if (overlay) lv_obj_set_hidden(overlay, true);
 }
 
@@ -203,6 +210,74 @@ static void theme_select(lv_event_t* event) {
 }
 static void open_appearance(lv_event_t*) { close_overlays(); refresh_appearance(); lv_obj_move_foreground(appearanceOverlay); lv_obj_set_hidden(appearanceOverlay, false); }
 static void close_appearance(lv_event_t*) { lv_obj_set_hidden(appearanceOverlay, true); }
+
+// CARDS: which selected AIs the display shows, and how many usage cards share a page.
+static int card_bit(const char* key) {
+  for (size_t i = 0; i < 8; ++i) if (strcmp(key, app_settings::nova_window_keys[i]) == 0) return static_cast<int>(i);
+  return -1;
+}
+static void select_style(lv_obj_t* button, lv_obj_t* caption, bool selected) {
+  style_button(button, selected);
+  lv_obj_set_style_text_color(caption, lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
+}
+static void refresh_cards() {
+  const auto layout = app_settings::card_layout();
+  for (size_t i = 0; i < 8; ++i) {
+    const bool present = i < cardProviderCount;
+    lv_obj_set_hidden(cardProviderButtons[i], !present);
+    if (!present) continue;
+    const int bit = card_bit(cardProviders[i]);
+    select_style(cardProviderButtons[i], cardProviderCaptions[i], bit < 0 || !(layout.hidden >> bit & 1u));
+  }
+  lv_obj_set_hidden(cardsEmpty, cardProviderCount != 0);
+  for (size_t i = 0; i < 3; ++i) select_style(perPageButtons[i], perPageCaptions[i], layout.perPage == kPerPageChoices[i]);
+  for (size_t i = 0; i < 3; ++i) select_style(homeCardButtons[i], homeCardCaptions[i], layout.homeCards == i + 1);
+}
+static void load_card_providers() {
+  // Identities load when the panel opens and stay fixed until it closes, so targets never move under a finger.
+  const auto snapshot = aim::read();
+  cardProviderCount = 0;
+  for (size_t v = 0; v < aim::kMaxViews && cardProviderCount < 8; ++v) {
+    if (snapshot.viewsConfigured && v >= snapshot.viewCount) break;
+    const char* key = snapshot.viewsConfigured ? snapshot.viewKeys[v] : snapshot.views[v].providerKey;
+    if (!key[0] || card_bit(key) < 0) continue;
+    snprintf(cardProviders[cardProviderCount], sizeof(cardProviders[0]), "%s", key);
+    const auto* style = aim::provider_style(key);
+    lv_label_set_text(cardProviderCaptions[cardProviderCount], style ? style->label : key);
+    ++cardProviderCount;
+  }
+}
+static void card_provider_cb(lv_event_t* event) {
+  const auto index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
+  if (index >= cardProviderCount) return;
+  const int bit = card_bit(cardProviders[index]);
+  if (bit < 0) return;
+  auto layout = app_settings::card_layout();
+  layout.hidden ^= static_cast<uint8_t>(1u << bit);
+  app_settings::set_card_layout(layout); refresh_cards();
+}
+static void per_page_cb(lv_event_t* event) {
+  const auto index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
+  if (index >= 3) return;
+  auto layout = app_settings::card_layout();
+  layout.perPage = kPerPageChoices[index];
+  app_settings::set_card_layout(layout); refresh_cards();
+}
+static void home_cards_cb(lv_event_t* event) {
+  const auto index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
+  if (index >= 3) return;
+  auto layout = app_settings::card_layout();
+  layout.homeCards = static_cast<uint8_t>(index + 1);
+  app_settings::set_card_layout(layout); refresh_cards();
+}
+static void open_cards(lv_event_t*) {
+  cardsReturnOnDone = false; close_overlays(); load_card_providers(); refresh_cards();
+  lv_obj_move_foreground(cardsOverlay); lv_obj_set_hidden(cardsOverlay, false);
+}
+static void close_cards(lv_event_t*) {
+  lv_obj_set_hidden(cardsOverlay, true);
+  if (cardsReturnOnDone) { cardsReturnOnDone = false; ui_settings_hide(); }
+}
 
 static void quota_text(lv_obj_t* label, const char* value) {
   if (strcmp(lv_label_get_text(label), value) != 0) lv_label_set_text(label, value);
@@ -518,7 +593,8 @@ void ui_settings_init() {
   lv_obj_set_style_pad_all(header, 0, 0);
   lv_obj_set_scrollable(header, false);
   make_label(header, 24, 12, 420, "LIMITBUDDY / DISPLAY " FW_VERSION, &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_label(header, 24, 34, 500, "Settings", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  make_label(header, 24, 34, 360, "Settings", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  make_button(header, 424, 16, 168, "CARDS", open_cards, nullptr);
   alertsButton = make_button(header, 608, 16, 168, "ALERTS", open_alerts, nullptr);
 
   auto* card = lv_obj_create(settingsScreen);
@@ -658,6 +734,35 @@ void ui_settings_init() {
   make_label(appearanceCard, 24, 286 + extraRow, 500, "Provider logos and warning colors stay consistent.", &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(appearanceOverlay, 616, 406, 136, "DONE", close_appearance, nullptr);
   lv_obj_set_hidden(appearanceOverlay, true);
+  cardsOverlay = lv_obj_create(lv_layer_top());
+  lv_obj_set_size(cardsOverlay, 800, 480); lv_obj_set_pos(cardsOverlay, 0, 0);
+  lv_obj_set_style_bg_color(cardsOverlay, lv_color_hex(ui_theme::background), 0);
+  lv_obj_set_style_bg_opa(cardsOverlay, LV_OPA_80, 0); lv_obj_set_style_pad_all(cardsOverlay, 0, 0);
+  lv_obj_set_style_border_width(cardsOverlay, 0, 0); lv_obj_set_scrollable(cardsOverlay, false);
+  auto* cardsCard = lv_obj_create(cardsOverlay); lv_obj_set_pos(cardsCard, 24, 54); lv_obj_set_size(cardsCard, 752, 340);
+  lv_obj_set_style_bg_color(cardsCard, lv_color_hex(ui_theme::surface), 0);
+  lv_obj_set_style_border_color(cardsCard, lv_color_hex(ui_theme::border), 0); lv_obj_set_style_pad_all(cardsCard, 0, 0);
+  lv_obj_set_scrollable(cardsCard, false);
+  make_label(cardsCard, 24, 18, 700, "Usage cards", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  make_label(cardsCard, 24, 58, 700, "SHOW ON THIS DISPLAY (TAP TO HIDE)", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  for (size_t i = 0; i < 8; ++i)
+    cardProviderButtons[i] = make_button(cardsCard, 24 + (i % 4) * 178, 82 + (i / 4) * 58, 166, "", card_provider_cb,
+                                         reinterpret_cast<void*>(i), &cardProviderCaptions[i]);
+  cardsEmpty = make_label(cardsCard, 24, 96, 700, "No AI selected on the PC yet.", &lv_font_montserrat_18, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(cardsCard, 24, 206, 340, "HOME SCREEN CARDS", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(cardsCard, 392, 206, 336, "USAGE PAGE CARDS", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  const char* homeNames[] = {"1", "2", "3"};
+  const char* perPageNames[] = {"1", "2", "4"};
+  for (size_t i = 0; i < 3; ++i) {
+    homeCardButtons[i] = make_button(cardsCard, 24 + i * 116, 230, 104, homeNames[i], home_cards_cb,
+                                     reinterpret_cast<void*>(i), &homeCardCaptions[i]);
+    perPageButtons[i] = make_button(cardsCard, 392 + i * 116, 230, 104, perPageNames[i], per_page_cb,
+                                    reinterpret_cast<void*>(i), &perPageCaptions[i]);
+  }
+  make_wrap_label(cardsCard, 24, 288, 704, "Home with 1 card shows every window, resets and the session. Usage with 4 uses compact cards.\n"
+                  "Hidden AIs still raise alerts. If all are hidden, all are shown.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_button(cardsOverlay, 616, 406, 136, "DONE", close_cards, nullptr);
+  lv_obj_set_hidden(cardsOverlay, true);
   quotaOverlay = lv_obj_create(lv_layer_top());
   lv_obj_set_size(quotaOverlay, 800, 480); lv_obj_set_pos(quotaOverlay, 0, 0);
   lv_obj_set_style_bg_color(quotaOverlay, lv_color_hex(ui_theme::background), 0);
@@ -718,7 +823,7 @@ void ui_settings_update() {
   if (!lv_obj_is_hidden(quotaOverlay) && millis() - quotaUpdatedAt >= 500u) {
     quotaUpdatedAt = millis(); refresh_quota_choices();
   }
-  const bool choosing = !lv_obj_is_hidden(appearanceOverlay) || !lv_obj_is_hidden(quotaOverlay) ||
+  const bool choosing = !lv_obj_is_hidden(appearanceOverlay) || !lv_obj_is_hidden(quotaOverlay) || !lv_obj_is_hidden(cardsOverlay) ||
                         !lv_obj_is_hidden(alertsOverlay) || !lv_obj_is_hidden(nightOverlay);
   if (choosing && lv_obj_get_index(saveFeedback) != static_cast<int32_t>(lv_obj_get_child_count(lv_layer_top())) - 1) lv_obj_move_foreground(saveFeedback);
   // Overlays fill the lower rows; the empty top centre keeps feedback clear of their cards and dimmed buttons.
@@ -743,7 +848,10 @@ void ui_settings_hide() {
   lv_obj_set_hidden(saveFeedback, true);
   lv_obj_set_hidden(alertsOverlay, true); lv_obj_set_hidden(nightOverlay, true);
   lv_obj_set_hidden(appearanceOverlay, true);
-  lv_obj_set_hidden(quotaOverlay, true);
+  lv_obj_set_hidden(quotaOverlay, true); lv_obj_set_hidden(cardsOverlay, true);
   lv_screen_load(settingsReturnScreen ? settingsReturnScreen : dashScreen);
 }
 bool ui_settings_is_active() { return lv_screen_active() == settingsScreen; }
+void ui_settings_open_cards() {
+  ui_settings_show(); open_cards(nullptr); cardsReturnOnDone = true;
+}
