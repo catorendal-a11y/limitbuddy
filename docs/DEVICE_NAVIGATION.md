@@ -18,9 +18,9 @@ BACK returns to the calling screen (Settings does too when closed). Quota popups
 
 | Screen | Behavior |
 | --- | --- |
-| **Home** | MENU and a large, fixed REFRESH. Refresh is disabled when the host is disconnected, lacks manual refresh or is updating, and is rechecked on activation. NEXT appears only with more providers; hiding it moves no other control. |
+| **Home** | MENU and a large, fixed REFRESH. Refresh is disabled when the host is disconnected, lacks manual refresh or is updating, and is rechecked on activation. NEXT appears only with more providers (swipe left/right also pages); hiding it moves no other control. |
 | **Menu** | HOME, USAGE, AGENTS, EVENTS, SETTINGS, HISTORY as 92-pixel targets; 56-pixel BACK. |
-| **Usage** | Two full-size provider cards per page by default; **SETTINGS > CARDS** switches to one large card or four compact cards. Provider identity is kept until touch release, even if data or order changes. |
+| **Usage** | Two full-size provider cards per page by default; **SETTINGS > CARDS** switches to one large card or four compact cards. Swipe left/right to change pages. Provider identity is kept until touch release, even if data or order changes. |
 | **History** | Compact Today / 24h / 7d view. |
 | **CARDS** (home, or Settings header) | Tap an AI to hide or show it on home and USAGE. **Home screen cards 1 / 2 / 3**: one card lists every window with its reset and the session or data age; three are slim rows. **Usage page cards 1 / 2 / 4**. Saved on the display; DONE returns to the calling screen. Hidden AIs still raise alerts; hiding all shows all. |
 | **Settings** | Two 56-pixel dropdowns with 26-pixel text replace eight brightness/dimming choices; brightness slider and test-dimming remain. Choices and persistence are unchanged. |

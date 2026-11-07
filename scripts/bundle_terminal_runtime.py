@@ -16,8 +16,8 @@ ROOT=Path(__file__).resolve().parents[1]
 PYTHON_VERSION='3.13.16'
 PYTHON_URL='https://www.python.org/ftp/python/3.13.16/python-3.13.16-embed-amd64.zip'
 PYTHON_SHA256='97dae5274cc54867065e8d5a3226e48c35017ed332a0fdb0e27d5b5821961297'
-ESPTOOL_SOURCE_SHA256='fd756598db0a26c9975fa18511b08687c54bf2ce7322ede80cf1f5117dad1f50'
-ESPTOOL_WHEEL_SHA256='a432dc49de9a5bc38306344bb365ae58d59618e6d4e08b2c837e05d341faad09'
+ESPTOOL_SOURCE_SHA256='86c7249e9cc3a824e032ede9ba20abad057a2c49e231418cc4f02b177bb36f42'
+ESPTOOL_WHEEL_SHA256='36e853193841929aba3e9dd979b867e53ef8aaa378464015d1d3cabf7e630384'
 # esptool ships only an sdist. Its wheel bytes depend on the setuptools version, so the
 # build backend is hash-pinned too instead of letting build isolation fetch the latest one.
 BUILD_SETUPTOOLS='setuptools==84.0.0'
@@ -62,12 +62,12 @@ def prepare_wheelhouse(scratch,wheels):
     """Build one reproducible pure-Python wheel, then hash-check every Windows wheel."""
     wheels.mkdir(parents=True,exist_ok=True)
     sources=scratch/'sources';sources.mkdir(exist_ok=True)
-    source=sources/'esptool-5.4.0.tar.gz'
+    source=sources/'esptool-5.6.0.tar.gz'
     if not source.exists():
         subprocess.run([sys.executable,'-m','pip','download','--no-cache-dir','--no-deps',
-            '--no-binary=:all:','--dest',str(sources),'esptool==5.4.0'],check=True)
+            '--no-binary=:all:','--dest',str(sources),'esptool==5.6.0'],check=True)
     if _sha256(source)!=ESPTOOL_SOURCE_SHA256:raise ValueError('esptool source archive checksum mismatch')
-    wheel=wheels/'esptool-5.4.0-py3-none-any.whl'
+    wheel=wheels/'esptool-5.6.0-py3-none-any.whl'
     if not wheel.exists():
         environment=dict(os.environ,SOURCE_DATE_EPOCH='1767225600')
         python=prepare_build_environment(scratch)

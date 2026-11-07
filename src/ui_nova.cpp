@@ -141,13 +141,20 @@ static void request_refresh(lv_event_t*) {
   if (snapshot.hostPresent && snapshot.manualRefreshSupported && !refresh_busy(snapshot.refreshState))
     aim::request_refresh();
 }
-static void say_hi(lv_event_t*) { state.greet(millis()); tapMs = millis(); tapped = true; ++tapCount;
+static void say_hi(lv_event_t*) { if (ui_interaction::swiped()) return; state.greet(millis()); tapMs = millis(); tapped = true; ++tapCount;
   pingMs = tapMs; pingColor = ui_theme::muted; pingDuration = 450; pinging = true;   // a quiet ping ring
   ui_nova_update(); }
-static void next_page(lv_event_t*) { page = (page + 1) % pageCount; ui_nova_update(); }
+static void move_page(int step) {
+  if (pageCount < 2) return;
+  page = static_cast<uint8_t>((page + pageCount + step) % pageCount); ui_nova_update();
+}
+static void next_page(lv_event_t*) { move_page(1); }
+// Swipe left for the next provider page, right for the previous one.
+static void swipe(lv_dir_t direction) { if (direction == LV_DIR_LEFT) move_page(1); else if (direction == LV_DIR_RIGHT) move_page(-1); }
+static void gesture(lv_event_t*) { if (auto* input = lv_indev_active()) swipe(lv_indev_get_gesture_dir(input)); }
 static void details(lv_event_t* event) {
   auto* card = static_cast<ProviderCard*>(lv_event_get_user_data(event));
-  if (!card) return;
+  if (!card || ui_interaction::swiped()) return;
   const auto snapshot = aim::read();
   for (size_t i = 0; i < aim::kMaxViews; ++i) {
     if (snapshot.viewsConfigured && i >= snapshot.viewCount) break;
@@ -172,6 +179,7 @@ void init() {
   lv_obj_set_style_bg_color(screen, lv_color_hex(ui_theme::background), 0);
   lv_obj_set_style_pad_all(screen, 0, 0); lv_obj_set_style_border_width(screen, 0, 0);
   lv_obj_set_scrollable(screen, false);
+  lv_obj_add_event_cb(screen, gesture, LV_EVENT_GESTURE, nullptr);
   auto* header = lv_obj_create(screen); lv_obj_set_pos(header, 0, 0); lv_obj_set_size(header, 800, 78);
   lv_obj_set_style_bg_color(header, lv_color_hex(ui_theme::header), 0);
   lv_obj_set_style_border_width(header, 0, 0); lv_obj_set_style_pad_all(header, 0, 0);
@@ -322,9 +330,11 @@ static void layout_card(ProviderCard& item, size_t slot, uint8_t mode) {
   lv_obj_set_size(item.card, 420, full ? 178 : slim ? 58 : 88);
   lv_obj_set_y(item.logoBox, full ? 4 : slim ? 5 : 14);
   lv_obj_set_y(item.name, full || slim ? 2 : 4);
-  lv_obj_set_hidden(item.session, slim);
-  lv_obj_set_y(item.session, full ? 28 : 29);
-  lv_obj_set_width(item.session, full ? 350 : 174);
+  lv_obj_set_width(item.name, slim ? 136 : 174);
+  // Slim cards carry the reset countdown beside the name instead of a session line.
+  lv_obj_set_pos(item.session, slim ? 200 : 62, full ? 28 : slim ? 8 : 29);
+  lv_obj_set_width(item.session, full ? 350 : slim ? 120 : 174);
+  lv_obj_set_style_text_align(item.session, slim ? LV_TEXT_ALIGN_RIGHT : LV_TEXT_ALIGN_LEFT, 0);
   lv_obj_set_hidden(item.percent, full);
   lv_obj_set_y(item.percent, slim ? 4 : 0);
   lv_obj_set_style_text_font(item.percent, slim ? &lv_font_montserrat_30 : &lv_font_montserrat_40, 0);
@@ -625,9 +635,11 @@ void update() {
     text(item.percent, value);
     lv_obj_set_hidden(item.bar, mode == 1 || view.informational || !hasRow);  // empty track reads as 0%; one card has its own rows
     if (lv_bar_get_value(item.bar) != static_cast<int32_t>(remaining)) lv_bar_set_value(item.bar, remaining, LV_ANIM_OFF);
-    char period[48], selectedStatus[64];
+    char period[48], selectedStatus[64], reset[24] = "";
     quota_window_label(row.windowMinutes, row.title, period, sizeof(period));
-    snprintf(selectedStatus, sizeof(selectedStatus), "%s%s", period, choice.automatic ? " / AUTO" : "");
+    if (fresh && row.hasResetCountdown) format_countdown(reset_remaining(row, view.quotaReceivedMs, now), reset, sizeof(reset));
+    else if (fresh) snprintf(reset, sizeof(reset), "%s", row.resetsShort);
+    snprintf(selectedStatus, sizeof(selectedStatus), "%s%s%s%s", period, choice.automatic ? " / AUTO" : "", reset[0] ? " / " : "", reset);
     const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.informational ? "Activity only / tap for setup" : (view.notice ? "ERROR / last good" :
                           (view.fetching ? "UPDATING / last good" : (!hasRow ? (choice.automatic ? "Waiting for data" : "Selected window unavailable") : (!fresh ? "STALE / last good" : selectedStatus)))));
     const auto provider_sessions = style ? session_status(snapshot, now, style->activityMask,agentCounts,live) : SessionStatus{};
@@ -671,8 +683,15 @@ void update() {
       else if (live && rows) snprintf(summary, sizeof(summary), age ? "Updated %lu min ago" : "Updated just now", age);
       else snprintf(summary, sizeof(summary), "%s", status);
       text(item.session, summary);
+    } else if (mode == 3) {
+      text(item.session, reset);
     } else {
-      text(item.session, session);
+      // Without a session event the line tells how old the shown quota is.
+      char summary[40];
+      const unsigned long age = (now - view.quotaReceivedMs) / 60000u;
+      if (session[0] || !fresh) snprintf(summary, sizeof(summary), "%s", session);
+      else snprintf(summary, sizeof(summary), age ? "Updated %lu min ago" : "Updated just now", age);
+      text(item.session, summary);
     }
     text(item.status, status);
   }

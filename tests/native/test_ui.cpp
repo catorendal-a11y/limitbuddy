@@ -65,6 +65,11 @@ static uint8_t testInitialBrightness = 160;
 } } while (false)
 
 uint32_t millis() { return fakeTick; }
+// A home card status names its window and may append the reset; AUTO only where expected.
+static bool status_is(lv_obj_t* label, const std::string& window) {
+  const std::string text = lv_label_get_text(label);
+  return text == window || (text.rfind(window + " / ", 0) == 0 && text.find("AUTO", window.size()) == std::string::npos);
+}
 namespace aim { Snapshot read() { return sample; } void request_refresh() { ++requestedRefreshes; } }
 namespace live_agent {UsbLiveSnapshot read_usb() {return liveSample;}}
 namespace agent {Snapshot read() {return agentSample;}}
@@ -320,7 +325,7 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   std::strcpy(sample.views[1].rows[2].title, "Monthly MCP"); sample.views[1].rows[2].windowMinutes = 43200;
   ui_nova_show();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "67%");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "7 DAYS / AUTO");
+  CHECK(status_is(nova_ui::providers[0].status, "7 DAYS / AUTO"));
   ui_settings_show(); lv_obj_send_event(quotaButton, LV_EVENT_CLICKED, nullptr);
   CHECK(!lv_obj_is_hidden(quotaOverlay) && quotaProviderCount == 3 && quotaChoiceCount == 2);
   CHECK(std::string(lv_label_get_text(quotaProviderLabel)) == "CODEX");
@@ -345,7 +350,7 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   screenshot(screenshots, "settings-quota-codex");
   close_quota(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "75%");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "5 HOURS");
+  CHECK(status_is(nova_ui::providers[0].status, "5 HOURS"));
   screenshot(screenshots, "nova-quota-5-hours");
   ui_settings_show(); lv_obj_send_event(quotaButton, LV_EVENT_CLICKED, nullptr);
   lv_obj_send_event(quotaNext, LV_EVENT_CLICKED, nullptr);
@@ -374,8 +379,8 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   CHECK(app_settings::nova_window("codex").minutes == 10080);
   close_quota(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "67%");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "7 DAYS");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[1].status)) == "MONTHLY MCP");
+  CHECK(status_is(nova_ui::providers[0].status, "7 DAYS"));
+  CHECK(status_is(nova_ui::providers[1].status, "MONTHLY MCP"));
   screenshot(screenshots, "nova-quota-week-month");
   // A harmless API title change retains the unique matching duration.
   std::strcpy(sample.views[0].rows[0].title, "Secondary"); ui_nova_update();
@@ -387,7 +392,7 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   // Ambiguous same-duration quotas must not be silently substituted.
   sample.views[0].rows[1].windowMinutes = 10080;
   ui_nova_update(); CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "--");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "Selected window unavailable");
+  CHECK(status_is(nova_ui::providers[0].status, "Selected window unavailable"));
   std::strcpy(sample.views[0].rows[1].title, "Week"); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "75%");
   sample.views[0].rows[0].valid = sample.views[0].rows[1].valid = false;
@@ -414,7 +419,7 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "75%");
   CHECK(nova_ui::mood == NovaMood::critical);
   sample.hostPresent = false; ui_nova_update();
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "OFFLINE / last good");
+  CHECK(status_is(nova_ui::providers[0].status, "OFFLINE / last good"));
   CHECK(app_settings::nova_window("codex").minutes == 300);
   // Known windows remain selectable without fabricating missing percentages.
   set_sample(1, 0); sample.views[0].hasUsage = false; sample.views[0].informational = true;
@@ -694,10 +699,10 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   agentSample.sessions[0] = agent::SessionCounts{1,0,0,0,4};
   ui_nova_update(); CHECK(nova_ui::mood == NovaMood::session_working);
   CHECK(std::string(lv_label_get_text(nova_ui::title)) == "Working");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "Activity only / tap for setup");
+  CHECK(status_is(nova_ui::providers[0].status, "Activity only / tap for setup"));
   sample.views[0].informational = false; sample.views[0].hasUsage = true; sample.views[0].rowCount = 1;
   sample.views[0].notice = true; ui_nova_update();
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "ERROR / last good");
+  CHECK(status_is(nova_ui::providers[0].status, "ERROR / last good"));
   screenshot(screenshots, "nova-session-quota-error");
   dashboard_show(); dashboard_update();
   CHECK(strstr(lv_label_get_text(big[0].vendor), "ERROR"));
@@ -705,14 +710,14 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   screenshot(screenshots, "usage-session-quota-status");
   ui_nova_show();
   sample.views[0].notice = false; sample.views[0].quotaReceivedMs = fakeTick - 300001u; ui_nova_update();
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "STALE / last good");
+  CHECK(status_is(nova_ui::providers[0].status, "STALE / last good"));
   screenshot(screenshots, "nova-session-quota-stale");
   dashboard_show(); dashboard_update();
   CHECK(strstr(lv_label_get_text(big[0].vendor), "STALE"));
   CHECK(strstr(lv_label_get_text(big[0].vendor), "RUNNING"));
   ui_nova_show();
   sample.views[0].quotaReceivedMs = fakeTick; sample.views[0].fetching = true; ui_nova_update();
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "UPDATING / last good");
+  CHECK(status_is(nova_ui::providers[0].status, "UPDATING / last good"));
   sample.views[0].fetching = false; sample.views[0].informational = true;
   sample.views[0].hasUsage = false; sample.views[0].rowCount = 0;
   const auto update_x = lv_obj_get_x(nova_ui::menuButton), update_y = lv_obj_get_y(nova_ui::menuButton);
@@ -731,7 +736,7 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   CHECK(!lv_obj_is_hidden(nova_ui::bubble) && !strcmp(lv_label_get_text(nova_ui::bubbleGlyph), "WAIT"));
   CHECK(lv_color_eq(lv_obj_get_style_border_color(nova_ui::bubble, LV_PART_MAIN), lv_color_hex(0xFFC857)));
   CHECK(std::string(lv_label_get_text(nova_ui::title)) == "Needs you");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "Activity only / tap for setup");
+  CHECK(status_is(nova_ui::providers[0].status, "Activity only / tap for setup"));
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].session)) == "Session: needs you");
   screenshot(screenshots, "nova-session-waiting");
   agentSample.sessions[0] = agent::SessionCounts{0,0,1,0,4}; ui_nova_update();
@@ -939,14 +944,28 @@ static void test_card_layout_and_hidden_ais(const std::filesystem::path& screens
   for (const auto& item : nova_ui::providers) { CHECK(!lv_obj_is_hidden(item.card)); CHECK(lv_obj_get_height(item.card) == 58); }
   CHECK(!lv_obj_is_hidden(nova_ui::providers[2].bar) && lv_obj_is_hidden(nova_ui::providers[2].status));
   CHECK(!strcmp(lv_label_get_text(nova_ui::pageLabel), "Providers / 1 of 2"));
+  for (const auto& item : nova_ui::providers) {                                  // the reset sits beside the name
+    CHECK(!lv_obj_is_hidden(item.session) && strlen(lv_label_get_text(item.session)) > 0);
+    check_inside(item.card, item.session); check_readable_text(item.session);
+    CHECK(lv_obj_get_x(item.name) + lv_obj_get_width(item.name) <= lv_obj_get_x(item.session));
+  }
   lv_obj_set_hidden(quota_banner::banner, true);
   screenshot(screenshots, "nova-three-cards");
+  nova_ui::swipe(LV_DIR_LEFT); CHECK(!strcmp(lv_label_get_text(nova_ui::pageLabel), "Providers / 2 of 2"));
+  nova_ui::swipe(LV_DIR_LEFT); CHECK(!strcmp(lv_label_get_text(nova_ui::pageLabel), "Providers / 1 of 2"));
+  nova_ui::swipe(LV_DIR_RIGHT); CHECK(!strcmp(lv_label_get_text(nova_ui::pageLabel), "Providers / 2 of 2"));
+  nova_ui::swipe(LV_DIR_BOTTOM); CHECK(!strcmp(lv_label_get_text(nova_ui::pageLabel), "Providers / 2 of 2"));
+  nova_ui::swipe(LV_DIR_RIGHT);
+  CHECK(!ui_interaction::swiped());                                              // no finger: card taps still open
   lv_obj_send_event(nova_ui::cardsButton, LV_EVENT_CLICKED, nullptr);            // CARDS on home opens the panel
   CHECK(ui_settings_is_active() && !lv_obj_is_hidden(cardsOverlay));
   close_cards(nullptr);
   CHECK(lv_screen_active() == nova_ui::screen);                                  // DONE returns home
   app_settings::set_card_layout({2, 1u << 0, 2}); ui_nova_update(); lv_obj_update_layout(nova_ui::screen);
   CHECK(lv_obj_get_height(nova_ui::providers[0].card) == 88 && !lv_obj_is_hidden(nova_ui::providers[0].percent));
+  CHECK(strstr(lv_label_get_text(nova_ui::providers[0].status), " / ") != nullptr);           // window and its reset
+  CHECK(!strncmp(lv_label_get_text(nova_ui::providers[0].session), "Updated", 7));            // data age without a session
+  check_inside(nova_ui::providers[0].card, nova_ui::providers[0].status); check_readable_text(nova_ui::providers[0].status);
   set_sample(4, 2); keep_quota_fresh();
 
   app_settings::set_card_layout({2, 0xFF});                                      // never an empty display
@@ -1368,6 +1387,11 @@ int main(int argc, char** argv) {
   CHECK(currentPage == 1);
   CHECK(std::string(lv_label_get_text(big[0].name)) == "CLAUDE");
   screenshot(screenshots, "dashboard-page-two");
+  swipe_cards(LV_DIR_RIGHT); CHECK(currentPage == 0);                                  // swipe back wraps by page
+  swipe_cards(LV_DIR_RIGHT); CHECK(currentPage == pageCount - 1);
+  swipe_cards(LV_DIR_LEFT); CHECK(currentPage == 0);
+  swipe_cards(LV_DIR_TOP); CHECK(currentPage == 0);                                    // vertical swipes do nothing
+  swipe_cards(LV_DIR_LEFT); dashboard_update(); CHECK(currentPage == 1);
   sample.automaticViews = true;
   sample.viewIntervalSeconds = 2;
   sample.activeView = 2;
@@ -1768,7 +1792,7 @@ int main(int argc, char** argv) {
   CHECK(lv_image_get_src(nova_ui::providers[1].icon) == &nova_assets::zcode48);
   screenshot(screenshots, "nova-working");
   sample.views[0].fetching = true; ui_nova_update();
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "UPDATING / last good");
+  CHECK(status_is(nova_ui::providers[0].status, "UPDATING / last good"));
   sample.views[0].fetching = false; sample.tokenSourceMask = 2; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::tracking)) == "TRACKING / ZCode");
   sample.tokenActivityMs = fakeTick - 35000u; ui_nova_update();
@@ -1784,7 +1808,7 @@ int main(int argc, char** argv) {
   sample.views[0].rows[1].usedPercent = 12; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::low);
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].percent)) == "12%");
-  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "7 DAYS / AUTO");
+  CHECK(status_is(nova_ui::providers[0].status, "7 DAYS / AUTO"));
   screenshot(screenshots, "nova-low");
   sample.views[0].rows[1].usedPercent = 5; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::critical);

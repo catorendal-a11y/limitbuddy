@@ -98,6 +98,16 @@ class BoardTests(unittest.TestCase):
             (root/'firmware/manifest.json').write_text(json.dumps({'schema':2,'boards':{'waveshare-s3-43':record}}))
             with self.assertRaises(control.SetupError): control.flash_command('update','COM6',root,board_id='waveshare-s3-43')
 
+    def test_application_larger_than_the_legacy_slot_needs_first_installation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); record = images(root, 'waveshare-s3-43')
+            with patch.object(control, 'LEGACY_APP_BYTES', 8):
+                (root/'firmware/manifest.json').write_text(json.dumps({'schema':2,'boards':{'waveshare-s3-43':record}}))
+                with self.assertRaises(control.SetupError) as raised:
+                    control.flash_command('update','COM6',root,board_id='waveshare-s3-43')
+                self.assertIn('First installation', str(raised.exception))
+                self.assertEqual(control.flash_command('install','COM6',root,board_id='waveshare-s3-43')[-2], '0x0')
+
     def test_factory_image_must_contain_the_matching_application(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); record = images(root, 'waveshare-s3-43')

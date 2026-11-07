@@ -68,10 +68,10 @@ class BundledRuntimeTests(unittest.TestCase):
         from unittest.mock import patch
         with tempfile.TemporaryDirectory() as directory:
             scratch=Path(directory)/'scratch';wheels=scratch/'wheels'
-            (scratch/'sources').mkdir(parents=True);(scratch/'sources/esptool-5.4.0.tar.gz').write_bytes(b'source')
+            (scratch/'sources').mkdir(parents=True);(scratch/'sources/esptool-5.6.0.tar.gz').write_bytes(b'source')
             def fake_run(command,**kwargs):
                 if 'wheel' in command:
-                    wheels.mkdir(parents=True,exist_ok=True);(wheels/'esptool-5.4.0-py3-none-any.whl').write_bytes(b'wheel')
+                    wheels.mkdir(parents=True,exist_ok=True);(wheels/'esptool-5.6.0-py3-none-any.whl').write_bytes(b'wheel')
                 return subprocess.CompletedProcess(command,0)
             digests={b'source':build.ESPTOOL_SOURCE_SHA256,b'wheel':build.ESPTOOL_WHEEL_SHA256}
             with patch.object(build.subprocess,'run',side_effect=fake_run) as run,\

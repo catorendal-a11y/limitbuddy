@@ -1,3 +1,24 @@
+# LimitBuddy v1.19.1-rc28
+
+## Easier to read and swipe
+
+- **Swipe** left or right on the home screen and the USAGE page to change provider pages. A swipe that
+  starts on a card no longer opens it.
+- **Two and three home cards** now show when the window resets; two cards also show how fresh the data is.
+- **Claude Opus and Sonnet weeks** appear as extra rows (OPUS WEEK, SONNET WEEK) when your plan reports them.
+
+## Host
+
+- Log lines carry the date. Unknown Claude usage fields are logged once by name (never values), so new
+  limits can be supported later.
+- esptool 5.6.0 (it no longer needs bitstring). The history writer gets time to finish on shutdown.
+
+## Waveshare S3: one-time First installation
+
+- The S3 firmware had used 97 % of its 6.25 MB slot. A new partition table gives it one 15.9 MB slot
+  (the unused second slot and filesystem are gone). **Use First installation once**; an application-only
+  update that would not fit an older table is refused with that advice. The P4 layout is unchanged.
+
 # LimitBuddy v1.19.1-rc27
 
 ## Choose what the display shows

@@ -692,6 +692,22 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual([(r["title"], r["windowMinutes"], r["usedPercent"], r["resetsAt"]) for r in rows],
                          [("Session", 300, 4.0, "2026-11-07T15:00:00Z"), ("Week", 10080, 0.5, "")])
 
+    def test_claude_model_weeks_follow_shared_windows_and_unknown_field_names_are_logged_once(self):
+        reply = {"five_hour": {"utilization": 10}, "seven_day": {"utilization": 20},
+                 "seven_day_opus": None, "seven_day_sonnet": {"utilization": 30},
+                 "extra_usage": {"secret_value": 99}, "limits": [{"x": 1}]}
+        logged = []
+        with patch.object(host, 'read_local_json', return_value={'claudeAiOauth': {'accessToken': 'test-token'}}), \
+                patch.object(host, '_claude_fields_seen', set()), patch.object(host, 'LOG', logged.append):
+            for _ in range(2):
+                with patch.object(host, "open_provider_request", return_value=self.response(reply)):
+                    rows, notice = host.fetch_claude()
+        self.assertIsNone(notice)
+        self.assertEqual([(r["title"], r["windowMinutes"]) for r in rows],
+                         [("Session", 300), ("Week", 10080), ("Sonnet week", 10080)])
+        self.assertEqual(logged, ["claude: unparsed usage fields: extra_usage, limits"])
+        self.assertNotIn("99", "".join(logged))
+
     def test_claude_oauth_usage_rejects_missing_token_and_empty_windows(self):
         for auth, reply in (({}, None), ({'claudeAiOauth': {'accessToken': 'bad\ntoken'}}, None),
                             ({'claudeAiOauth': {'accessToken': 'test-token'}}, {"five_hour": None, "seven_day": None}),

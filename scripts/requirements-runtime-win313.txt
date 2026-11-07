@@ -1,10 +1,9 @@
-bitstring==5.0.0
 cffi==2.1.1
 click==8.5.0
 colorama==0.4.6
 cryptography==50.0.2
 esp-pylib==1.2.0
-esptool==5.4.0
+esptool==5.6.0
 intelhex==2.3.0
 linkify-it-py==2.2.0
 lz4==4.4.5
@@ -21,6 +20,5 @@ reedsolo==1.7.0
 rich==15.0.0
 rich-click==1.9.9
 textual==8.2.8
-tibs==2.0.2
 typing_extensions==4.16.0
 websockets==17.3

@@ -506,14 +506,19 @@ static CardWidgets build_compact_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t
 // ───────────────────────────────────────────────────────────────────────────────
 // BUILD
 // ───────────────────────────────────────────────────────────────────────────────
-static void next_page_cb(lv_event_t*) {
-  currentPage = (currentPage + 1u) % pageCount;
+static void move_page(int step) {
+  if (pageCount < 2) return;
+  currentPage = static_cast<uint8_t>((currentPage + pageCount + step) % pageCount);
   lastPageMs = millis();
 }
+static void next_page_cb(lv_event_t*) { move_page(1); }
+// Swipe left for the next card page, right for the previous one.
+static void swipe_cards(lv_dir_t direction) { if (direction == LV_DIR_LEFT) move_page(1); else if (direction == LV_DIR_RIGHT) move_page(-1); }
+static void gesture_cb(lv_event_t*) { if (auto* input = lv_indev_active()) swipe_cards(lv_indev_get_gesture_dir(input)); }
 
 static void open_card_cb(lv_event_t* event) {
   const auto* card = static_cast<CardWidgets*>(lv_event_get_user_data(event));
-  if (!card || !card->providerKey[0]) return;
+  if (!card || !card->providerKey[0] || ui_interaction::swiped()) return;
   // A configuration frame may arrive between the last draw and release.
   // Follow the identity the user saw, never a newly rebound numeric slot.
   const auto snapshot = aim::read();
@@ -527,6 +532,7 @@ void dashboard_init() {
   lv_obj_t* scr = lv_screen_active();
   ui_theme::watch(scr);
   dashboardScreen = scr;
+  lv_obj_add_event_cb(scr, gesture_cb, LV_EVENT_GESTURE, nullptr);
   lv_obj_set_style_bg_color(scr, lv_color_hex(C_BG), 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(scr, 0, 0);

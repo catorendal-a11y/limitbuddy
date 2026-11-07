@@ -73,7 +73,7 @@ It adds a command to `~/.claude/settings.json` only if no custom statusline exis
 | Request | `GET https://api.anthropic.com/api/oauth/usage` |
 | Header | `anthropic-beta: oauth-2025-04-20` |
 | Token | Local Claude Code OAuth access token from `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR` honored) |
-| Mapping | `five_hour` = **Session** (300 min), `seven_day` = **Week** (10080 min); `utilization` is already a percentage |
+| Mapping | `five_hour` = **Session** (300 min), `seven_day` = **Week** (10080 min), then `seven_day_opus` / `seven_day_sonnet` (**OPUS WEEK** / **SONNET WEEK**) when reported; the panel keeps three. `utilization` is already a percentage. Other fields are logged once by name only |
 | Rate | At most one request per 5 min (reply cached); failures back off via the per-provider retry cooldown |
 | Renewal | The access token lasts about 8 hours and Claude Code desktop does not rewrite the file. Within 10 min of `expiresAt` the worker runs the official `claude auth status` (no model turn, output discarded, 10 s timeout) so Claude Code renews its own login, then rereads the file |
 | Guards | Endpoint allowlisted in `tools/host_security.py`; token read only inside the quota worker subprocess, never logged, stored or passed in arguments; no model turn |

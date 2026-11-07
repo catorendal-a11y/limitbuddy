@@ -1,0 +1,8 @@
+# Name,   Type, SubType,  Offset,  Size,   Flags
+# Waveshare ESP32-S3 16 MB: one large application slot. Updates are written over USB,
+# so the unused second OTA slot and filesystem space go to the application.
+# app0 keeps the 0x10000 offset used by application-only updates.
+nvs,      data, nvs,      0x9000,   0x5000,
+otadata,  data, ota,      0xe000,   0x2000,
+app0,     app,  ota_0,    0x10000,  0xFE0000,
+coredump, data, coredump, 0xff0000, 0x10000,

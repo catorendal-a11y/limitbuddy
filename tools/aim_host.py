@@ -110,7 +110,7 @@ _log_lock = threading.Lock()
 
 
 def LOG(msg):
-    line = f"[{time.strftime('%H:%M:%S')}] {safe_text(msg)}"
+    line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {safe_text(msg)}"
     if sys.stdout is not None:
         print(line, flush=True)
     # Rotation and append must not interleave between threads; the file may hold
@@ -453,6 +453,24 @@ def claude_oauth():
     return oauth if isinstance(oauth, dict) else {}
 
 
+# Model-specific weekly limits follow the shared ones; the panel keeps the first three reported.
+CLAUDE_WINDOWS = (("five_hour", "Session", 300), ("seven_day", "Week", 10080),
+                  ("seven_day_opus", "Opus week", 10080), ("seven_day_sonnet", "Sonnet week", 10080))
+_claude_fields_seen = set()
+
+
+def note_claude_fields(data):
+    """Log the names (never values) of unparsed usage fields once, so new limits can be supported later."""
+    if not isinstance(data, dict):
+        return
+    known = {name for name, _, _ in CLAUDE_WINDOWS}
+    fields = sorted(str(key)[:40] for key, value in data.items()
+                    if key not in known and value not in (None, [], {}) and key not in _claude_fields_seen)
+    if fields:
+        _claude_fields_seen.update(fields)
+        LOG("claude: unparsed usage fields: " + ", ".join(fields[:12]))
+
+
 def fetch_claude():
     """Claude plan quota via the local Claude Code OAuth login (read-only; token stays in memory)."""
     try:
@@ -471,7 +489,8 @@ def fetch_claude():
         with open_provider_request(req) as r:
             data = read_json_response(r)
         rows = []
-        for name, title, minutes in (("five_hour", "Session", 300), ("seven_day", "Week", 10080)):
+        note_claude_fields(data)
+        for name, title, minutes in CLAUDE_WINDOWS:
             window = data.get(name)
             if window is None:
                 continue
@@ -484,7 +503,7 @@ def fetch_claude():
                          "resetsAt": claude_reset_iso(window.get("resets_at")), "windowMinutes": minutes})
         if not rows:
             return None, "Claude: no plan quota in response"
-        return rows, None
+        return rows[:3], None  # the panel protocol carries three windows
     except urllib.error.HTTPError as error:
         if cli_missing and error.code in (401, 403):
             return None, ProviderNotice("Claude: login expired; install the Claude Code CLI to renew it",

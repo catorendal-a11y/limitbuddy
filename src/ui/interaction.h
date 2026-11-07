@@ -17,6 +17,11 @@ inline void cancel_dragged_press(lv_event_t* event) {
   // an unsaved value until the user eventually lifts the finger.
   lv_obj_send_event(object, LV_EVENT_PRESS_LOST, input);
 }
+// LVGL still sends CLICKED after a swipe that stayed on one target; page swipes must not open it.
+inline bool swiped() {
+  auto* input = lv_indev_active();
+  return input && lv_indev_get_gesture_dir(input) != LV_DIR_NONE;
+}
 inline void keep_target(lv_obj_t* object) {
   lv_obj_set_press_lock(object, true);
   lv_obj_add_event_cb(object, cancel_dragged_press, LV_EVENT_PRESSING, nullptr);

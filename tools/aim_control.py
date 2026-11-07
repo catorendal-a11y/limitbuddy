@@ -228,6 +228,10 @@ def start_host(root=ROOT, emit=print):
     emit("Host process started in the background. Check USB and provider status in the app; a running process does not confirm a connection.")
 
 
+# Application slot in partition tables older than rc28; a larger image needs First installation once.
+LEGACY_APP_BYTES = 0x640000
+
+
 def firmware_file(kind, root=ROOT, board_id='guition-p4'):
     if kind not in ('install', 'update'): raise SetupError('Unknown firmware operation.')
     try: board = get_board(board_id)
@@ -271,6 +275,8 @@ def firmware_file(kind, root=ROOT, board_id='guition-p4'):
                 validate_factory(data, app, board)
     except (ValueError, KeyError, TypeError, AttributeError, OSError, struct.error):
         raise SetupError('Firmware board/chip/layout or checksum verification failed. Extract a matching release package.') from None
+    if kind == 'update' and len(data) > LEGACY_APP_BYTES:
+        raise SetupError('This firmware needs the larger partition layout. Choose First installation once.')
     return path
 
 
