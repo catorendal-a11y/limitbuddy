@@ -1,11 +1,13 @@
 # PC requirements
 
-Windows 10/11 x64 and built-in Windows PowerShell. Windows Terminal is recommended.
-Download `nova-v1.19.1-rc18-windows-x64-terminal.zip`, extract it to a permanent writable folder and double-click
-Install-LimitBuddy.cmd. Python and pinned libraries are included; installation works offline
-after the ZIP download. No separate Python, pip, Node.js, Qt or administrator access is
-required. Provider quotas and optional official AI-client setup still need internet.
-USB monitoring requires a data cable, the correct serial driver and a supported board.
+| Need | Details |
+| --- | --- |
+| OS | Windows 10/11 x64 with built-in Windows PowerShell; Windows Terminal recommended |
+| Package | `nova-v1.19.1-rc25-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25), extracted to a permanent writable folder |
+| Install | Double-click `Install-LimitBuddy.cmd`; Python and pinned libraries are included, and install works offline after the download |
+| Not required | Separate Python, pip, Node.js, Qt, administrator access |
+| Internet | Only for provider quotas and optional official AI-client setup |
+| USB | Data cable, correct serial driver, supported board ([boards](BOARDS.md)) |
 
-Git checkouts and GitHub's automatic source archives require Python 3.10+ and dependency downloads.
-See [installation](TERMINAL.md). Linux/macOS source use is described separately.
+> [!NOTE]
+> Git checkouts and GitHub's automatic source archives need Python 3.10+ and dependency downloads; see [installation](TERMINAL.md#development-and-linuxmacos).

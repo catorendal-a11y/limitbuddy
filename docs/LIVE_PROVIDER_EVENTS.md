@@ -1,103 +1,78 @@
 # Local live provider events
 
-The USB live domain has opt-in Codex, Claude Code and ZCode lifecycle observers. This is source-level
-integration with synthetic validation, not a claim of physical USB operation or complete provider
-coverage. The [device agent view](LIVE_AGENT_VIEW.md) now exists with native validation; normal P4 USB operation has been physically verified. Real client delivery remains a separate gate. Quota/token sources remain independent.
+Opt-in Codex, Claude Code and ZCode lifecycle observers feed the USB live domain. Source-level integration with synthetic validation; normal P4 USB operation is physically verified, but real client delivery remains a separate gate. Quota and token sources are independent. Device screen: [Live agent view](LIVE_AGENT_VIEW.md).
 
-## Setup in the PC program
+## Data flow
 
-Save the selected provider, then choose **Link Codex session events** or **Link Claude session events**
-or **Link ZCode session events** in AI setup. A private backup is kept and existing hooks are preserved. Removing the link removes only
-this installation's exact hook commands and invalidates its observation generation.
+```mermaid
+flowchart LR
+    A["Provider hook"] --> B["aim_events.py"]
+    B --> C["Fixed-schema files in tools/activity"]
+    C --> D["Host LiveSampler"]
+    D --> E["UsbLiveClient"]
+    E --> F["Device agent view"]
+```
 
-The console also supports explicit `--link-events codex|claude|zcode` and
-`--unlink-events codex|claude|zcode`; the named provider must already be selected.
-ZCode uses its documented user-level process hooks. Existing global disablement is
-preserved; confirm Hooks is enabled in ZCode and start a new session. Only its seven
-documented events are accepted; no per-subagent coverage is claimed. See the
-[official ZCode contract](https://zcode.z.ai/en/docs/hooks).
+## Setup
 
-Codex uses the effective CODEX_HOME/hooks.json file and documented lifecycle hooks. The hook definition
-must be reviewed/trusted in Codex's hook browser (CLI `/hooks`) before it runs; changed definitions
-require review again. Do not bypass hook trust. Restart the session after linking. Installed-client
-compatibility and genuine hook delivery remain validation gates; a saved link is not proof of delivery.
+Save the selected provider, then in AI setup choose **Link Codex / Claude / ZCode session events** (**Agents > Provider events**, leave Remove off, type `LINK`). A private backup is kept and existing hooks are preserved. Removing the link removes only this installation's exact hook commands and invalidates its observation generation.
 
-Claude Code uses its existing explicit observational hook setup. These hooks never return an approval,
-denial, rewritten input, model context or continuation instruction. The Codex shell wrapper returns
-only neutral `{}` JSON, including on observer failure, because Stop/SubagentStop expect JSON output.
-The helper itself emits no content. There are no provider API calls or new model turns.
+Console: `--link-events codex|claude|zcode` and `--unlink-events ...`; the provider must already be selected.
 
-## Honest state mapping
+| Provider | Mechanism | Notes |
+| --- | --- | --- |
+| Codex | Effective `CODEX_HOME/hooks.json`, documented lifecycle hooks ([docs](https://learn.chatgpt.com/docs/hooks)) | Review and trust hooks in `/hooks` before they run; changed definitions need review again. Never bypass trust. Restart the session. Shell wrapper returns only neutral `{}` JSON, even on observer failure, because Stop/SubagentStop expect JSON. |
+| Claude Code | Explicit observational hooks; `--claude-event` is the hook command, `--link-events claude` installs it ([docs](https://code.claude.com/docs/en/hooks)) | Hooks never return approval, denial, rewritten input, model context or continuation. Restart Claude Code. |
+| ZCode | Documented user-level process hooks ([docs](https://zcode.z.ai/en/docs/hooks)) | Only its seven documented events accepted; no per-subagent coverage. Existing global disablement preserved; confirm Hooks is enabled, start a new session. |
 
-| Reported event | Display metadata |
+> [!IMPORTANT]
+> A saved link is not proof of delivery. Installed-client compatibility and genuine hook delivery remain validation gates. No provider API calls and no new model turns; the helper emits no content. Other providers have no live observer yet.
+
+## State mapping
+
+| Reported event | Display state |
 | --- | --- |
 | SessionStart | IDLE |
-| UserPromptSubmit, unclassified tool use, PostToolUse | WORKING (reported lifecycle, no guessed detailed phase) |
+| UserPromptSubmit, unclassified tool use, PostToolUse | WORKING (no guessed detailed phase) |
 | PermissionRequest, supported Claude attention notification | WAITING |
 | Codex apply_patch; Claude Edit/MultiEdit | EDITING |
 | Claude Write / Read / WebFetch | WRITING / READING |
-| Claude Bash / PowerShell | RUNNING, without inspecting command text |
+| Claude Bash / PowerShell | RUNNING (command text not inspected) |
 | Claude Grep/Glob/WebSearch | SEARCHING |
-| Stop/SubagentStop | COMPLETED: response/agent ended, not proof that a build or task succeeded |
-| Claude StopFailure / PostToolUseFailure | ERROR; interrupted tool failure becomes IDLE |
-| Claude PermissionDenied | NEEDS_ATTENTION; auto-mode denial observation, never an approval/retry |
-| Claude TeammateIdle | IDLE for the identified teammate, preserving the parent |
-| Claude TaskCreated / TaskCompleted | Separate bounded create/complete-request metadata, not confirmed task success |
+| Stop/SubagentStop | COMPLETED: response/agent ended, not proof a build or task succeeded |
+| Claude StopFailure / PostToolUseFailure | ERROR (interrupted tool failure becomes IDLE) |
+| Claude PermissionDenied | NEEDS_ATTENTION (auto-mode denial observation, never an approval/retry) |
+| Claude TeammateIdle | IDLE for that teammate, parent preserved |
+| Claude TaskCreated / TaskCompleted | TASK_CREATE_REQUESTED / TASK_COMPLETE_REQUESTED: bounded request metadata, not confirmed success |
 | Codex Interrupt | IDLE |
 | SessionEnd | Remove the parent session entry |
 
-Shell commands are never inspected to guess BUILDING or TESTING. THINKING is not inferred from
-token increases or an absence of tool events. Subagent start/stop records use separately hashed
-identities; detailed tool attribution is unavailable when a hook only identifies the parent session.
-UNKNOWN means the phase is not reported. ZCode uses the shared prompt/tool/permission/stop
-states and tool-failure mapping; it does not report subagent start/stop through this adapter.
-Other providers have no live event observer yet.
+- Shell commands are never inspected to guess BUILDING/TESTING. THINKING is never inferred from token increases or missing tool events. UNKNOWN = phase not reported.
+- Subagent start/stop use separately hashed identities; tool attribution is unavailable when a hook identifies only the parent. ZCode shares the prompt/tool/permission/stop mapping but reports no subagents.
+- Claude task hooks run before other handlers can veto, so they never increment confirmed task counts or replace the parent phase. Titles and descriptions are discarded.
 
-Only a SHA-256 actor identity, fixed state, observation timestamp, optional observed start/finish
-timestamps, schema and setup generation are stored. Raw prompts, commands, messages, tool results and transcript paths are discarded. Records
-are the most recently received observation, not a provider heartbeat or authoritative execution log.
-Closed/stale/future-dated/invalid records are excluded. Ongoing observations expire after 15 minutes;
-terminal/idle states expire after 30 seconds. The agent screen shows last-event age explicitly.
-NOVA reacts only to source observations no older than 30 seconds. Sending a fresh USB packet never
-renews the source timestamp or proves that a quiet client is alive.
+## Timing
 
-An independent event worker reads only selected, enabled sources, scans bounded records and sends at most
-eight agents. Waiting/failure observations have priority; this is not a total-agent count. Metadata
-does not enter token commands or quota snapshots. Host health exports only the live transport's fixed
-status, timestamp and acknowledged count; no agent identities or content. Worker samples older than ten seconds are
-cleared. The host's serial owner negotiates live support, correlates replies and continues quota
-monitoring if live telemetry times out. Serial I/O errors still reach the existing reconnect handler.
-If USB disappears, the device's separate 30-second lease bounds retained display state.
-The PC's Agent USB status distinguishes acknowledged delivery, expired samples and errors.
-An acknowledged empty snapshot confirms transport availability, not a genuine client event.
+A UserPromptSubmit or SubagentStart starts a timer; tool events keep that start. Stop/SubagentStop/StopFailure/Interrupt/SessionEnd/TeammateIdle freeze a known timer; a new prompt starts a new one. Without an observed start the UI says start unknown. No token-derived start or inferred progress. Durations are capped at seven days and wall-clock rollback is rejected. Same-provider updates use a bounded local file lock so concurrent hooks cannot overwrite a newer event. No network listener, no new dependency.
 
-References: [official Codex hooks](https://learn.chatgpt.com/docs/hooks),
-[Claude Code hooks](https://code.claude.com/docs/en/hooks), [USB domain](USB_LIVE_TRANSPORT.md).
+## Stored data and freshness
 
-## Observed session timing
+Stored: SHA-256 actor identity, fixed state, observation time, optional observed start/finish times, schema, setup generation. Discarded: prompts, commands, messages, tool results, transcript paths. Records are the latest received observation, not a heartbeat or execution log.
 
-A UserPromptSubmit or SubagentStart event starts a timer. Tool events preserve that start.
-Stop/SubagentStop/StopFailure/Interrupt/SessionEnd/TeammateIdle freeze a known timer; a new prompt
-starts a new turn timer. Without an observed start, the UI says start unknown. No token-derived
-start time or inferred task progress is used. Durations are bounded to seven days and wall-clock
-rollback is rejected. Same-provider updates use a bounded local file lock so concurrent hook
-processes cannot overwrite a newer event. No network listener or new dependency is introduced.
+| Rule | Value |
+| --- | --- |
+| Ongoing observations expire | 15 min |
+| Terminal/idle states expire | 30 s |
+| NOVA reacts only to sources no older than | 30 s (a fresh USB packet never renews source time) |
+| Excluded | Closed, stale, future-dated, invalid records |
+| Worker samples cleared after | 10 s |
+| Device lease after USB loss | 30 s |
+| Agents sent | At most 8; waiting/failure first; not a total count |
 
-Claude task hooks run before other handlers can veto; their separate records therefore say
-TASK_CREATE_REQUESTED / TASK_COMPLETE_REQUESTED. They never increment confirmed task-success
-counts or replace the parent agent phase. Titles/descriptions are discarded.
+## Transport
 
-Firmware advertises `liveMetadata: 2`. The host sends optional elapsed/last-observed seconds only
-to that capability, and downgrades state names plus removes timing for older firmware. USB/AIM1
-quota messages, permission authority and source records stay separate.
+An independent event worker reads only selected, enabled sources with bounded scans. Metadata never enters token commands or quota snapshots. Host health exports only the live transport's fixed status, timestamp and acknowledged count, with no identities or content. The serial owner negotiates live support, correlates replies and keeps quota monitoring if live telemetry times out; serial I/O errors still reach the reconnect handler. Firmware advertises `liveMetadata: 2`; the host sends elapsed/last-observed seconds only to that capability and downgrades state names and drops timing for older firmware. The PC's Agent USB status distinguishes acknowledged delivery, expired samples and errors; an acknowledged empty snapshot confirms transport, not a genuine client event.
 
-## Local Codex diagnostic checkpoint
+## Diagnostic checkpoint (historical, October 2026)
 
-The installed official client's read-only `hooks/list` RPC reported all ten current user hooks
-trusted and enabled, without warnings. The observer's neutral no-op wrapper completed in 250 ms.
-At that earlier checkpoint, the running desktop app-server predated the hook installation.
-The deeper October 15 audit found a newer running process and still no observer records, so that
-earlier hypothesis does not explain the current installation. A fresh inventory does not
-prove that a running conversation delivers events. See [the deeper integration audit](AGENT_INTEGRATION_AUDIT.md).
-No hook trust, permission settings, transcripts
-or model sessions were modified for this check. The monitor does not force-restart other agents.
+A read-only `hooks/list` RPC showed all ten Codex user hooks trusted and enabled, and the neutral wrapper ran in 250 ms. A later audit found no observer records from a running process. A fresh inventory does not prove a running conversation delivers events. No trust, permissions, transcripts or sessions were modified. See [Agent integration audit](AGENT_INTEGRATION_AUDIT.md).

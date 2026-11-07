@@ -1,35 +1,33 @@
 # Device notification center
 
-Open **MENU > EVENTS**. The summary shows the unread count; the center provides
-four fixed rows per page, NEXT PAGE when needed, BACK and READ ALL. Reading notifications
-never approves a tool, dismisses a provider permission or executes a command.
+Open **MENU > EVENTS**. The summary shows the unread count. The center has four fixed rows per page, NEXT PAGE when needed, BACK and READ ALL.
 
-The bounded in-memory center holds at most 32 events for 24 hours within the current device boot:
+> [!NOTE]
+> Reading notifications never approves a tool, dismisses a provider permission or runs a command.
 
-- observed agent activity start, response completion, attention and error transitions;
-- USB host connection/disconnection;
-- current quota warning/critical transitions from the existing quota policy.
+```mermaid
+flowchart LR
+  A["Agent activity<br>start, done, attention, error"] --> C["Center<br>max 32 events, 24 h<br>this boot only"]
+  U["USB host<br>connect, disconnect"] --> C
+  Q["Quota policy<br>warning, critical"] --> C
+  C --> V["EVENTS screen"]
+```
 
-Entries store a fixed event type, provider/source, rollover-safe local time and read flag. Text comes
-from fixed English strings. There are no prompts, hints, tool arguments, paths, credentials or
-transcripts, and nothing is persisted. Entries use relative age and are ordered by event time.
-Missing actors are never turned into completion events. Repeated unchanged states are deduplicated.
-Only source observations no older than 30 seconds create agent events.
+## What it stores
 
-This first device center observes normalized snapshot transitions, rather than an exhaustive
-PC event journal: very short transitions between host samples can be absent. COMPLETED means a
-reported response/agent ended, not a confirmed task/build/test success. Structured task requests are
-stored separately on the PC and do not create success notifications here. Permission decisions,
-companion-pack failures and storage/build integrations remain separate future event sources.
+- Fixed event type, provider/source, rollover-safe local time and read flag, shown as relative age and ordered by event time.
+- Fixed English text only. No prompts, hints, tool arguments, paths, credentials or transcripts; nothing is persisted.
+- Missing actors never become completion events; repeated unchanged states are deduplicated; only source observations no older than 30 seconds create agent events.
 
-Quota popup behavior remains independent. The center hides the popup while visible, and marking
-an entry read does not acknowledge or suppress future quota warnings. The center participates in
-all four palettes without moving controls.
+## Limits
 
-Native tests cover bounded storage, repeated snapshots, disconnect, terminal/attention events,
-expiry/rollover, paging, empty data, read marking, stable controls and theme application. Physical
-USB/boot/memory checks are recorded in V2_VALIDATION.md after flashing.
+- It observes normalized snapshot transitions, not a full PC event journal, so very short transitions between host samples can be missing.
+- COMPLETED means a reported response/agent ended, not that a task, build or test succeeded. Structured task requests live on the PC and create no success notifications here.
+- Permission decisions, companion-pack failures and storage/build integrations are not event sources yet.
+- Quota popups stay independent: the center hides the popup while visible, and marking an entry read does not acknowledge or suppress future warnings. It works in all four palettes without moving controls.
+
+Native tests cover bounded storage, repeated snapshots, disconnect, terminal/attention events, expiry/rollover, paging, empty data, read marking, stable controls and themes. Physical USB/boot/memory checks go in V2_VALIDATION.md after flashing.
 
 ![Synthetic native notification center](images/notification-center-native-preview.png)
 
-This preview uses synthetic events; it is not a photograph or real account activity.
+The preview uses synthetic events, not a photograph or real account activity.

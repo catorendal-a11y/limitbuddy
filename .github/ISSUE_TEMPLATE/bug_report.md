@@ -17,14 +17,13 @@ What happened, and what did you expect?
 
 ## Environment
 
-- Firmware version:
+- Firmware version and `limitbuddy --version`:
 - Board/display:
-- Operating system / Python:
+- OS / Python:
 - Provider / CLI version:
 - Connected serial devices:
+- Physical hardware or native tests?
 
 ## Evidence
 
-Attach redacted status messages or screenshots. Never attach keys, auth files, databases, raw account responses or private logs. Use SECURITY.md for vulnerabilities.
-
-Did this occur on physical hardware or in native tests?
+Redacted status messages or screenshots only. Never attach keys, auth files, databases, raw account responses or private logs. Vulnerabilities: use SECURITY.md.

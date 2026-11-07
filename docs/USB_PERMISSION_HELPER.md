@@ -1,117 +1,63 @@
 # USB permission implementation status
 
-Permissions are not enabled in production. The normal Claude permission dialog remains the
-fallback. USB attachment and a local pipe do not authenticate a device approval.
+> [!WARNING]
+> **Permissions are not enabled in production.** The normal Claude permission dialog remains the fallback. USB attachment and a local pipe do not authenticate a device approval. Everything below is developer-only until physical validation passes.
 
-## Implemented and tested
+## Request path (developer only, disabled)
 
-- `src/interaction/` owns the generic request, state machine and controller independently of
-  ClaudeLiveSnapshot. The existing native LVGL dialog uses this domain. Its continuous 1.8-second
-  hold, complete visible details, cancellation and one-time final commit gates are preserved.
-- `tools/aim_permission.py` is a separate PermissionRequest helper. It extracts the tool and all
-  canonical arguments, bounded to 320 printable ASCII characters. Requests that cannot be fully
-  reviewed use the normal Claude dialog. It never truncates arguments before approving.
-- Each request has a random 128-bit ID and 256-bit nonce, revision 1 and a maximum 25-second
-  lifetime. Exact response correlation is required. The output contains only Claude's documented
-  allow/deny behavior; it cannot modify tool input or persistent permission rules.
-- `tools/permission_ipc.py` uses local Windows named pipes with an explicit current-user DACL,
-  remote-client rejection and bounded JSON bytes. No TCP listener, pickle or shell dispatch.
-  Kernel-reported peer PIDs are checked against installed host/helper executable paths.
-- `tools/permission_broker.py` holds one request and checks local opt-in, authenticated device,
-  host instance, session, nonce, revision and deadline. Disconnect, context change and ambiguous
-  decisions consume/cancel authority. Its bounded replay ledger stores IDs/nonces, never arguments;
-  exhaustion rejects further requests until a new host instance rather than forgetting old requests.
-- `tools/permission_service.py` implements the optional local IPC service and rechecks authority
-  immediately before returning a decision. Its endpoint contains only PID and instance ID. Endpoint
-  removal is scoped to its owner; prompt arguments are not written to disk or logs.
-- The retired graphical prototype built a separate `AI-Monitor-Permission.exe`. The current
-  terminal package does not build or distribute that helper, and production permission
-  approval remains disabled.
-- `tools/permission_runtime.py` now manages explicit attachment to the existing Panel owner,
-  authenticated client/service shutdown and host-instance replay protection across reconnections.
-  User opt-in and a separate locally constructed validation gate are both required. Disabled
-  attachment never reads a trust file or opens IPC. Failed/ambiguous startup is not retried on the
-  same connection; an incomplete service shutdown blocks replacement until host restart.
-- `Panel.attach_permission_runtime`, event routing, periodic pumping and close hooks are connected.
-  Normal startup creates an inactive coordinator; the local release gate remains false, so it cannot
-  read trust records, start IPC or authorize approvals. An authenticated best-effort close cancels device
-  authority on normal shutdown without awaiting/retrying a response; disconnect uses lease expiry.
-- `src/interaction/permission_delivery.h` provides a bounded, one-shot UI/serial handoff. The actual
-  PermissionView must commit its earned decision before admission. Final consumption checks both
-  the current request and a local UI observation less than 100 ms old. Native LVGL tests exercise
-  hold/deny through this gate; native cases cover changed request, hidden UI, trust loss, expiry,
-  rollover and forged envelopes. The developer adapter now connects task synchronization and final
-  ESP serial transmission; real hardware validation remains required.
+```mermaid
+flowchart LR
+  C["Claude PermissionRequest hook"] --> A["tools/aim_permission.py helper"]
+  A -- "same-user named pipe" --> S["permission_service / broker (host)"]
+  S -- "authenticated USB, existing serial owner" --> D["Device runtime"]
+  D --> V["PermissionView (UI task)"]
+  V -. "earned hold, one decision" .-> D
+  D -. "signed decision" .-> S
+  S -. "allow or deny" .-> A
+  A -. "documented stdout" .-> C
+```
 
-## Device runtime integration checkpoint
+The host never starts the service in normal operation; the local release gate is false, so no trust file is read, no IPC is opened and no approval is authorized. The observational events hook (`AI-Monitor-Events`) has no approval capability.
 
-`src/interaction/permission_serial.h` now joins the authenticated request domain to the earned
-UI handoff. It signs only when normal USB output is empty and there is capacity for a whole bounded
-decision packet. Connection, request lifetime and UI freshness are checked again after signing and
-after capacity checks. No signed decision is queued behind ordinary output. Short/ambiguous writes
-consume authority and invalidate the session; they are never retried.
+## What exists
 
-`permission_runtime_esp.*` connects this core to the existing serial task and a recursive task mutex,
-without running LVGL on that task. Local cancellation uses an atomic revocation latch before waiting
-for the mutex. Local opt-in is a versioned atomic latest-value request; an older enable cannot replace
-a newer disable because an action queue is full. Consent starts off, is not saved, cannot be set by a
-USB field, and cannot wrap its generation. Trust is loaded on the serial task only after local opt-in.
+| Component | Behavior |
+| --- | --- |
+| `src/interaction/` | Generic request, state machine and controller, independent of ClaudeLiveSnapshot. Native LVGL dialog keeps the 1.8 s continuous hold, complete visible details, cancellation and one-time final commit |
+| `tools/aim_permission.py` | Separate PermissionRequest helper. Extracts tool and all canonical arguments, bounded to 320 printable ASCII chars; anything not fully reviewable uses the normal Claude dialog; never truncates before approving |
+| Request identity | Random 128-bit ID, 256-bit nonce, revision 1, max 25 s lifetime, exact response correlation. Output is only Claude's documented allow/deny; cannot alter tool input or persistent rules |
+| `tools/permission_ipc.py` | Windows named pipes, explicit current-user DACL, remote clients rejected, bounded JSON bytes; no TCP, pickle or shell. Kernel-reported peer PIDs checked against installed host/helper paths |
+| `tools/permission_broker.py` | One request; checks local opt-in, authenticated device, host instance, session, nonce, revision, deadline. Disconnect, context change and ambiguous decisions consume/cancel authority. Replay ledger stores IDs/nonces only; exhaustion rejects requests until a new host instance |
+| `tools/permission_service.py` | Optional local IPC service; rechecks authority right before returning a decision. Endpoint holds only PID and instance ID; prompt arguments never reach disk or logs |
+| `tools/permission_runtime.py` | Explicit attachment to the existing Panel owner; host-instance replay protection across reconnects. Needs user opt-in **and** a separate locally constructed validation gate. Disabled attachment never reads trust or opens IPC. Failed/ambiguous startup is not retried; incomplete service shutdown blocks replacement until host restart |
+| `Panel.attach_permission_runtime` | Event routing, pumping, close hooks connected; normal startup makes an inactive coordinator. Best-effort authenticated close cancels device authority on shutdown (no await/retry); disconnect relies on lease expiry |
+| `tools/claude_permission_setup.py` | Hook setup; still expects the retired `AI-Monitor-Permission.exe`, not exposed in the terminal, not packaged |
 
-`src/ui_permission.cpp` owns the existing PermissionView on the UI task, rechecks awake/visible state,
-and offers only an earned and committed envelope. Failed publication reads revoke before hiding.
-Actual LVGL wrapper tests cover a continuous hold and immediate cancellation on publication failure;
-the lower-level pointer/visibility/drag/touch-read tests remain in place.
+## Device runtime (developer environment `esp32p4-permission-integration`)
 
-The `esp32p4-permission-integration` environment compiles this developer path. Its TX buffer is bounded
-to 2,048 bytes and HWCDC writes use a zero timeout. It starts with device opt-in off, has no wire opt-in
-command, and is not a production flash/release target. Normal P4/S3 builds keep interactionProtocol 0
-and do not create a permission overlay. Explicit opt-in UI/provider setup is implemented as described
-below; compile/native tests do not establish physical approval safety.
+| Piece | Rule |
+| --- | --- |
+| `permission_delivery.h` | Only a real UI-owner commit admits a decision; one-shot. Final consumption checks the current request and a UI observation younger than 100 ms |
+| `permission_serial.h` | Signs only when normal USB output is empty and a whole packet fits (max 768 bytes); rechecks connection, lifetime and UI freshness after signing and capacity checks. No signed decision queues behind ordinary output; short/ambiguous writes consume authority, invalidate the session, are never retried |
+| `permission_runtime_esp.*` | Joins the serial task and a recursive task mutex; no LVGL on that task. Local cancel uses an atomic revocation latch before waiting for the mutex. Opt-in is a versioned atomic latest-value request (an older enable cannot replace a newer disable). Consent starts off, is not saved, has no wire/USB field and cannot wrap. Trust loads on the serial task only after local opt-in |
+| `src/ui_permission.cpp` | Owns PermissionView on the UI task; rechecks awake/visible; offers only an earned, committed envelope. Failed publication reads revoke before hiding |
 
-## Explicit setup and removal
+Normal P4/S3 builds keep `interactionProtocol` 0 and create no permission overlay; the developer environment is not a release target. Native tests (hold/deny through the gate, changed request, hidden UI, trust loss, expiry, rollover, forged envelopes) do not establish physical approval safety.
 
-Production NOVA deliberately exposes no USB-permission preference or permission-hook action.
-**Settings > Edit settings** omits the internal `usb_permissions` flag, and normal P4/S3 firmware
-keeps the approval runtime disabled. There is therefore no supported permission helper to install
-or remove in rc18.
+## Setup and removal
 
-The separate enrollment-only path is available under **Device > Connect PC**. Open
-**MENU > SETTINGS > CONNECT PC** on the physical display, tap **CONNECT PC** there, then run the
-terminal action and compare every code group. This can enroll a PC key on supported developer
-firmware; it does not enable permissions or authorize a tool decision.
-
-The same display page has a separate permission toggle in the developer firmware. Consent resets
-on every reboot. Normal firmware shows a disabled preview control until physical release validation.
-Every permission still requires a new 1.8-second hold; an already-held finger cannot start approval
-when a dialog appears. PC preferences cannot enable the local production validation gate.
-
-The IPC service is deliberately not started by normal host startup. Synthetic locally constructed
-trust contexts establish state-machine behavior only; they do not establish actual USB trust.
-Observational provider-event hooks remain separate and have no approval capability.
+- The production terminal exposes **no** permission preference or hook action; **Settings > Edit settings** omits `usb_permissions`. There is no supported helper to install or remove.
+- Enrollment-only path: **MENU > SETTINGS > CONNECT PC** on the display, then terminal Device tab > **Connect PC**; compare every code group. It enrolls a key on supported developer firmware and does not enable permissions ([details](USB_INTERACTION_AUTH.md)).
+- Developer firmware has a separate permission toggle on the same page; consent resets on every reboot and normal firmware shows a disabled preview. Each request still needs a new 1.8 s hold (a finger already down cannot start approval). PC preferences cannot open the local validation gate.
+- Fallback: unavailable host, invalid request or timeout gives empty stdout and exit 0, so Claude keeps its normal flow. Never an automatic allow.
 
 ## Remaining production gates
 
-The authenticated session, bounded request transport, PC enrollment/DPAPI and serial-owner
-broker adapter foundations now have real-crypto native interoperability tests. ESP primitives
-were physically measured on P4. This does not enable production approvals; see
-[authenticated USB foundation](USB_INTERACTION_AUTH.md).
+1. Physically validate enrollment (code comparison, NVS record/readback, DPAPI). Never take `trustedChannel` from a JSON boolean or matching board model.
+2. Physically validate the developer adapter: task synchronization, UI publication, immediate serial write, authenticated decisions, disconnect cancellation. Quota/live state stay in separate structures.
+3. Validate explicit desktop/device opt-in and Claude PermissionRequest setup with packaged programs.
+4. Verify packaged helper/server, hold/drag/touch failure, expiry and unplug; confirm the real hook contract without synthetic evidence.
 
-1. Physically validate the now-connected enrollment-only path, explicit PC/device code comparison,
-   fixed NVS record/readback and current-user DPAPI storage. Authenticated permission sessions
-   remain separate and disabled; enrollment alone must never enable them.
-   Never obtain trustedChannel from an incoming JSON boolean or merely matching a board model.
-2. Physically validate the now-connected developer adapter, ESP task synchronization,
-   UI publication and immediate serial write, with authenticated decisions
-   and disconnect cancellation through the existing serial owner. Quota/live-agent state remains
-   in separate structures.
-3. Validate the implemented explicit desktop/device opt-in and dedicated Claude PermissionRequest
-   setup using the packaged programs. No real hook was installed during synthetic testing.
-4. Verify the actual packaged helper/server, physical hold/drag/touch failure, expiry and unplug
-   behavior. Confirm the real Claude hook contract without synthetic approval presented as evidence.
+No interactive hook is installed and no real tool permission has been approved. See [USB_INTERACTION_AUTH.md](USB_INTERACTION_AUTH.md), [PERMISSION_UI.md](PERMISSION_UI.md).
 
-No runtime interactive hook is installed by this development checkpoint. No real tool permission
-has been approved. An unavailable host, invalid request or timeout produces empty stdout and exit 0
-so Claude retains its normal permission flow; it never produces an automatic allow.
-
-References: [Claude hook contract](https://code.claude.com/docs/en/hooks#permissionrequest),
-[Windows pipe access control](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights).
+References: [Claude hook contract](https://code.claude.com/docs/en/hooks#permissionrequest), [named pipe security](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights).

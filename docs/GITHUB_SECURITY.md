@@ -1,33 +1,56 @@
 # GitHub security
 
-Public source does not grant a reader access to the maintainer's PC. Readers can copy the code and propose pull requests; they cannot push changes to this repository without explicit write permission. The monitor does not auto-pull or execute code from GitHub on the maintainer's PC. Review a contribution before running it locally or merging it.
+Public source does not give a reader access to the maintainer's PC. Readers can copy code and propose pull requests but cannot push without write permission. The monitor never auto-pulls or executes code from GitHub. Review a contribution before running or merging it.
 
-## Repository controls verified on 2026-10-09
+## Repository controls (verified 2026-10-09)
 
-- The owner is the only account with repository write/admin access. No deploy keys, webhooks or self-hosted Actions runners are configured. Repository Actions secrets and variables are empty. Builds run on GitHub-hosted Ubuntu/Windows machines.
-- The default workflow token is read-only and cannot approve pull requests. All external contributor workflows require maintainer approval. Read the code and workflow diff before approving; approval permits code execution on a GitHub runner.
-- Actions are limited to checkout, setup-python, upload-artifact, download-artifact and attest-build-provenance from the official `actions` organization. Full commit SHA pinning is required by repository policy. Checkouts do not retain Git credentials.
-- Main branch deletion and force pushes are blocked. Existing `v*` tags cannot be moved or deleted. Only administrators can create new version tags. Normal owner commits remain possible.
-- Build/test jobs use read-only repository permission. Release publishing is a separate job: it downloads this run's package, produces build-provenance attestations for the terminal ZIP/checksum file, and creates a draft with an existing version tag. It does not check out or execute repository code, install dependencies, or run generated executables. Only that publisher has contents-write, id-token-write and attestations-write permission. A maintainer still reviews and publishes the draft.
-- Secret scanning, push protection, private vulnerability reporting and Dependabot security updates are enabled. CI checks dependency advisories. Local provider keys/configuration, CLI auth, logs and databases are excluded from Git and release exports.
-- Release immutability is enabled for future publications. Once a new immutable release is published, its assets and associated tag are locked. Existing v1.12.0/v1.12.1 release assets were published before this setting and are not retroactively immutable; their tags are separately protected by the repository rules. Do not replace published assets: make a new reviewed version.
+| Area | Setting |
+| --- | --- |
+| Access | Owner is the only account with write/admin. No deploy keys, webhooks or self-hosted runners. Actions secrets and variables empty. Builds run on GitHub-hosted Ubuntu/Windows |
+| Workflow token | Default read-only; cannot approve pull requests. All external contributor workflows need maintainer approval (read the code **and** workflow diff first: approval runs code on a runner) |
+| Actions | Only `actions` org: checkout, setup-python, upload-artifact, download-artifact, attest-build-provenance. Full commit SHA pinning required. Checkouts keep no Git credentials |
+| Branches/tags | Main deletion and force push blocked. Existing `v*` tags cannot be moved or deleted; only administrators create version tags |
+| Scanning | Secret scanning, push protection, private vulnerability reporting, Dependabot security updates on; CI checks dependency advisories. Local keys/config, CLI auth, logs, databases excluded from Git and release exports |
+| Immutability | On for future releases: published assets and tag lock. v1.12.0/v1.12.1 predate it (tags protected by rules). Never replace published assets; ship a new reviewed version |
 
-The repository cannot protect against takeover of its owner's GitHub account. Keep two-factor authentication or a passkey enabled, keep recovery methods private, and review newly authorized GitHub applications/tokens. The current API connection does not expose the owner's two-factor status; it was not verified. Checksums alone do not authenticate an asset obtained with its checksum from a compromised account.
+> [!WARNING]
+> Nothing here protects against takeover of the owner's GitHub account. Keep two-factor or a passkey, keep recovery methods private, review newly authorized apps/tokens. Two-factor status was not verifiable through the API connection. A checksum fetched from a compromised account authenticates nothing.
 
-For releases with attestations, verify the downloaded terminal ZIP with `gh attestation verify <file> --repo catorendal-a11y/limitbuddy`. This verifies GitHub workflow provenance, not Windows Authenticode publisher signing or a guarantee of safe source code. The publisher attests the verified artifacts passed by the isolated Windows build; generated executables are never executed in the privileged job. See [GitHub artifact attestation guidance](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds).
+## Release permissions
 
-## Check for a path back to the maintainer's PC
+```mermaid
+flowchart LR
+  T["Push v* tag"] --> P["prepare: read-only"]
+  P --> F["firmware: read-only"]
+  F --> W["windows: read-only"]
+  W --> R["publish: only job with write"]
+  R --> D["Draft release (maintainer publishes)"]
+```
 
-The reviewed monitor has no inbound network listener, tunnel, remote-control endpoint, automatic GitHub update or GitHub-to-PC runner/webhook. Its internet requests query fixed provider endpoints over verified HTTPS. Panel traffic is USB serial data, not keyboard input; this firmware has no Wi-Fi/OTA or USB HID keyboard implementation. Only a valid refresh event queues a quota update. It does not install software, flash firmware, execute a command or read an arbitrary requested file.
+| Job | Permission | Notes |
+| --- | --- | --- |
+| prepare | contents: read | Skips the build if a release for the tag exists, so a reviewed release is never overwritten |
+| firmware, windows | contents: read | Build and test only |
+| publish | contents, id-token, attestations: write; actions: read | Downloads this run's artifact, verifies the ZIP against `SHA256SUMS.txt`, attests ZIP and checksum file, `gh release create --verify-tag --draft`. Does not check out or execute repository code, install dependencies or run generated executables |
 
-Historical note: the retired v1.18.1 desktop window handoff uses a per-installation `QLockFile` and `QLocalServer` with **UserAccessOption**. On Windows this is a local named pipe restricted to the current user, not a TCP listener. Only exact bounded `show`/`firmware` window commands are accepted; they restore the existing window/page. The handoff returns no credentials or file contents and cannot start/stop the host, run commands or change settings. Pending clients and input length are bounded. The private lock file is excluded from Git/release exports. [Qt local access restrictions](https://doc.qt.io/qt-6/qlocalserver.html#SocketOption-enum).
+Verify a download: `gh attestation verify <file> --repo catorendal-a11y/limitbuddy`. This proves GitHub workflow provenance, not Authenticode publisher signing or safe source. See [attestation guidance](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds) and [RELEASING.md](RELEASING.md).
 
-Synthetic security tests feed execution/install/download/flash/file commands into USB replies, command-like fields into API quota data, execution notifications into Codex's local account RPC, and path/command fields into telemetry input. These inputs must not dispatch processes, expose keys in panel data or write outside the numeric telemetry folder. The database reader is also checked against an extension-loading view; SQLite extension loading is not enabled. CI reports the current passing test count. Both running monitor processes had zero listening network sockets during the recorded v1.18.1 check. Source batch launchers use the absolute system PowerShell path.
+## No path back to the maintainer's PC
 
-Quota polling uses an allowlisted, numeric-only child process. Its stdin carries the configured credential; the key never appears in command arguments. The host reaps a timed-out worker and its descendants before retrying. This worker only reads account quota, and cannot accept a model-turn, firmware or arbitrary-command request. Source/frozen host ownership checks the actual Python script or executable entry point, rather than a matching path anywhere in a process command line.
+The reviewed monitor has no inbound listener, tunnel, remote-control endpoint, automatic GitHub update or GitHub-to-PC runner/webhook.
 
-This establishes no identified backdoor in the reviewed implementation; it is not proof that every dependency or the entire PC is unexploitable. The optional official Codex installation remains a user-requested installation of trusted external software, and ordinary quota polling never invokes it. A modified local program, malicious code deliberately installed/merged by the owner, account takeover, or already installed malware remain outside this guarantee. Do not execute unreviewed pull requests on the PC or configure a self-hosted runner here.
+| Surface | Boundary |
+| --- | --- |
+| Internet | Fixed allowlist `PROVIDER_ENDPOINTS` (`tools/host_security.py`), verified HTTPS, redirects rejected ([review](SECURITY_REVIEW.md)) |
+| USB panel | Serial data, not keyboard input; no Wi-Fi/OTA or USB HID. Only a valid refresh event queues a quota update; nothing installs, flashes, executes or reads a requested file |
+| Quota worker | Allowlisted numeric-only child process. Z.AI key arrives on stdin, never in arguments; the Claude worker reads its local login itself (no stdin credential). Timed-out workers and descendants are reaped before retry. Accepts no model-turn, firmware or command requests. Ownership checks use the actual script/executable entry point, not a path anywhere in a command line |
+| Retired v1.18.1 desktop handoff | Used a per-installation `QLockFile` and `QLocalServer` (**UserAccessOption**, current-user named pipe, no TCP) accepting only bounded `show`/`firmware` window commands; no credentials, files or settings. [Qt docs](https://doc.qt.io/qt-6/qlocalserver.html#SocketOption-enum) |
 
-Policy tests check pinned Actions, disabled checkout credential persistence, GitHub-hosted runners, the isolated write-permission job, draft-only/tag-verified publishing and absence of privileged pull-request triggers or named secrets. Install `scripts/requirements-test.txt` to run these tests locally. These tests complement the server settings; those settings must be reviewed independently if the repository is copied to another owner.
+Synthetic security tests feed execution/install/download/flash/file commands into USB replies, command-like fields into API quota data, execution notifications into Codex's account RPC and path/command fields into telemetry. None may dispatch processes, expose keys in panel data or write outside the numeric telemetry folder. The database reader is also checked against an extension-loading view; SQLite extension loading is not enabled. Source launchers use the absolute system PowerShell path. Zero listening sockets were recorded in the v1.18.1 check.
 
-Sources: [fork workflow approval and repository Actions policy](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository), [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases), [future-only release immutability](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/establish-provenance-and-integrity/prevent-release-changes).
+Policy tests check pinned Actions, disabled checkout credential persistence, GitHub-hosted runners, the isolated write-permission job, draft-only tag-verified publishing, and absence of privileged pull-request triggers or named secrets (`scripts/requirements-test.txt`). Review the server settings independently if the repository is copied to another owner.
+
+> [!IMPORTANT]
+> No backdoor was identified, but this is not proof that every dependency or the whole PC is unexploitable. Outside the guarantee: a modified local program, code deliberately installed or merged by the owner, account takeover, installed malware. The optional Codex install is user-requested trusted software and ordinary polling never invokes it. Do not run unreviewed pull requests on the PC or add a self-hosted runner.
+
+Sources: [Actions policy and fork approval](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository), [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases), [future-only immutability](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/establish-provenance-and-integrity/prevent-release-changes).

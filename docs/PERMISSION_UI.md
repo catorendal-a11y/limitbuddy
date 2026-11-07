@@ -1,80 +1,62 @@
 # Live permission UI prototype
 
-The v2 permission dialog is implemented and tested with actual native LVGL pointer input.
-It is **not initialized in production** and has no BLE adapter or real permission sender.
-USB/AIM1 quota monitoring, provider setup and companion rendering remain separate.
+> [!WARNING]
+> The dialog is implemented and tested with native LVGL pointer input but is **not initialized in production firmware** and has no production permission sender. Bluetooth is permanently excluded.
 
 ![Native synthetic permission dialog during a hold](images/permission-native-prototype.png)
 
-This preview uses a synthetic request. It is not evidence of a paired device or a real tool approval.
+Synthetic request; not evidence of a paired device or real tool approval.
 
 ## Interaction contract
 
-`PermissionView` has fixed DENY and HOLD TO APPROVE targets, request identity, tool, full bounded
-hint and hold progress. Approval requires a continuous 1,800 ms hold with fresh successful pointer
-samples inside the same target. CLICKED, keyboard activation, short taps and long-press notifications
-never approve. Drag-out, release, failed touch reads, navigation, stale data, changed ID or complete
-details, disconnect, opt-out, sleeping or demo mode cancel the action.
-The fixed CLOSE button also cancels outstanding queue/commit authority, including for a request
-that cannot be reviewed or approved locally. It never sends a permission decision.
+`PermissionView` has fixed DENY and HOLD TO APPROVE targets, request identity, tool, full bounded hint and hold progress.
 
-Every detail must fit and remain visible. Unsupported glyphs or overflowing details are nonapprovable;
-the user reviews those requests on Desktop. A popup above the dialog, system overlay, hidden field,
-opacity change or clipped/moved dialog also blocks its final send gate. Label content is compared
-with the full canonical request, not a displayed prefix. Buttons remain in the same coordinates
-through state and text changes, including while pressed.
+| Input | Result |
+| --- | --- |
+| Continuous 1,800 ms hold with fresh successful pointer samples in the same target | Approves |
+| CLICKED, keyboard activation, short tap, long-press notification | Never approves |
+| Drag-out, release, failed touch read, navigation, stale data, changed ID or details, disconnect, opt-out, sleep, demo mode | Cancels |
+| Fixed CLOSE | Cancels queue/commit authority (also for unreviewable requests); sends no decision |
 
-## Authority, queue and final send
+- Every detail must fit and stay visible. Unsupported glyphs or overflow make the request nonapprovable; review it on Desktop.
+- A popup above the dialog, system overlay, hidden field, opacity change or clipped/moved dialog also blocks the final send gate. Labels are compared with the full canonical request, not a displayed prefix. Buttons keep their coordinates through state and text changes.
 
-The interaction authority is `PermissionController`, independent of LVGL, parser and transport.
-It must outlive its view; closing/recreating widgets must not reset the consumed-request ledger.
-Only trusted local connection/security/settings/display state can create `PermissionContext`.
-All flags default closed. JSON cannot assert host trust, opt-in or an authenticated connection.
+## Authority and final send
 
-The future adapter must follow this sequence:
+`PermissionController` is independent of LVGL, parser and transport and must outlive its view, so recreating widgets cannot reset the consumed-request ledger. Only trusted local connection/security/settings/display state creates `PermissionContext`; all flags default closed and JSON cannot assert trust, opt-in or authentication.
 
-1. Feed validated, bounded snapshots through synchronized copies. Never share a mutable parser
-   snapshot with the UI thread, and never retain/log transcript or request hints in history/export.
-2. Update/show the view on the UI task using the same monotonic millisecond clock as the parser.
-   Full visibility is verified before the request enters DISPLAYED and before accepting pointer input.
-3. After an earned hold or denial, `take` prepares exactly one bounded envelope for the queue.
-   An envelope alone is **not** authorization to send.
-4. Immediately before TX, the UI owner calls `commit` with a fresh snapshot and trusted context.
-   The view rechecks actual visibility/text; the controller rechecks issued identity, lease, security
-   and state, then consumes that issued envelope even on failure.
-5. The transport rechecks its current authenticated link/epoch at submission and sends once.
-   Serialize only the exact request ID and allowlisted decision, not the tool/hint. Failed or
-   ambiguous delivery enters ERROR and is never retried as an approval. No delayed queue may bypass
-   this final gate or use stale visibility/security values.
+```mermaid
+sequenceDiagram
+  participant P as Parser/transport
+  participant U as UI owner
+  participant C as PermissionController
+  participant T as Transport
+  P->>U: "Validated bounded snapshot copy"
+  U->>U: "Show view, verify full visibility"
+  U->>C: "take: earned hold or deny"
+  C-->>U: "One bounded envelope (not authorization)"
+  U->>C: "commit: fresh snapshot + trusted context"
+  C-->>U: "Envelope consumed, even on failure"
+  U->>T: "Exact request ID + allowlisted decision"
+  T->>T: "Recheck authenticated link and epoch, send once"
+```
 
-An omitted prompt or successful transport write is not an acknowledgement. The archived
-[Hardware Buddy reference](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md)
-does not define a correlated permission ACK. ACKNOWLEDGED remains reserved for a documented trusted
-acknowledgement source; the current prototype never invents one.
+Rules for the adapter:
 
-## Validation and remaining gates
+1. Share only synchronized copies with the UI thread; never retain or log transcripts or hints in history/export.
+2. Use the parser's monotonic millisecond clock; verify full visibility before DISPLAYED and before pointer input.
+3. The envelope alone never authorizes sending; `commit` rechecks visibility/text, issued identity, lease, security and state.
+4. Serialize only the request ID and decision, not tool/hint. Failed or ambiguous delivery enters ERROR and is never retried. No delayed queue may bypass the final gate or use stale values.
 
-The pure controller tests cover incomplete display, interrupted holds, final prompt/epoch/security
-checks, expiry, one-time queue/commit consumption and cancellation after queue handoff.
-Native P4/S3 identity tests cover 22 pointer/visibility scenarios: valid hold, denial, short tap,
-touch failure, drag-out, changed IDs/details, disconnect, expiry, unsupported/long text, demo,
-sleep/opt-out, popup/system overlays, navigation, hidden/faded/clipped details and altered visible
-text and closing after queue handoff. They also verify fixed controls and that view recreation
-cannot repeat a consumed approval.
+A successful write is not an acknowledgement: the archived [Hardware Buddy reference](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md) defines no correlated permission ACK, so ACKNOWLEDGED stays reserved for a documented trusted source and is never invented.
 
-These tests do not establish physical touch reliability or real provider permission behavior.
-Bluetooth is permanently excluded; future integration uses USB through the existing PC host.
-A production adapter requires independently verified host trust, a documented provider decision
-interface, explicit local opt-in, synchronized publication, bounded TX/RX and physical disconnect
-tests. USB attachment alone cannot assert security. See [USB-only integration](USB_LIVE_TRANSPORT.md).
-The default remains no live permission transmission.
+## Validation and gates
 
-The updated production plan uses a separate AI-Monitor-Permission helper for Claude Code's
-PermissionRequest hook, same-user local IPC and the existing USB host. AI-Monitor-Events must never
-gain permission authority. Generic interaction/request/decision types and trustedChannel context
-now replace the prototype's ClaudeLiveSnapshot/security dependency in the permission UI.
-Keep every tested physical hold, cancellation, visibility and single-use final commit check.
-The separate helper, same-user IPC and host broker/service have synthetic tests, including actual
-local Windows pipe roundtrips. Authenticated USB integration and explicit opt-in setup remain
-pending; the host does not start the service. See [implementation status](USB_PERMISSION_HELPER.md)
-and [phase 7](../plans/COMPANION_V2.md).
+- Controller tests: incomplete display, interrupted holds, prompt/epoch/security checks, expiry, one-time consumption, cancellation after handoff.
+- Native P4/S3 pointer/visibility tests: valid hold, denial, short tap, touch failure, drag-out, changed IDs/details, disconnect, expiry, unsupported/long text, demo, sleep/opt-out, overlays, navigation, hidden/faded/clipped/altered text; fixed controls; view recreation cannot repeat an approval.
+- These do not establish physical touch reliability or real provider behavior.
+
+> [!IMPORTANT]
+> A production adapter needs independently verified host trust, a documented provider decision interface, explicit local opt-in, synchronized publication, bounded TX/RX and physical disconnect tests. Default: no permission transmission.
+
+Plan: separate helper `tools/aim_permission.py` (the events hook never gains authority), same-user IPC, existing USB host; generic interaction types replace the old ClaudeLiveSnapshot dependency. Path and status: [USB_PERMISSION_HELPER.md](USB_PERMISSION_HELPER.md), [USB_INTERACTION_AUTH.md](USB_INTERACTION_AUTH.md), [USB_LIVE_TRANSPORT.md](USB_LIVE_TRANSPORT.md), [phase 7](../plans/COMPANION_V2.md).

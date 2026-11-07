@@ -1,89 +1,136 @@
 # Choose your AI providers
 
-For the connection checklist, a live observation test, optional local history and Claude's separate
-session-event integration, see [Usage insights](USAGE_INSIGHTS.md).
+Setup check, live test and history: [Usage insights](USAGE_INSIGHTS.md).
 
-First-time setup has **no preselected AI**. Open **Settings > Edit settings** in NOVA and select one or more providers explicitly. Unselected providers are not polled or scanned. A missing API key never silently changes your selection. Existing pre-selection configurations retain the old Codex/ZCode combination when loaded; newly created configurations contain `"providers": []` until setup is completed.
+> [!IMPORTANT]
+> No AI is preselected. Open **Settings > Edit settings** in NOVA and select providers explicitly. Unselected providers are never polled or scanned, and a missing API key never changes your selection. New configs contain `"providers": []`; older configs keep their Codex/ZCode choice.
 
-## What each choice supports
+## Comparison
 
-| Choice | Automatic local token activity | Quota display | Setup |
+| Provider | Activity source (local, automatic) | Quota source | Setup |
 | --- | --- | --- | --- |
-| Codex | Numeric counters in the default local Codex SQLite database | Official CLI account interface, with legacy file fallback | Choose Codex; setup offers official installation/sign-in as needed. See CODEX_SETUP.md. |
-| ZCode | Numeric request counters in the local ZCode SQLite database | Existing Z.AI coding-plan adapter | Choose ZCode. Its optional coding-plan key is requested only for this selection. |
-| Claude Code | Assistant usage fields from local CLI JSONL transcripts; repeated message IDs are deduplicated | Documented statusline rate-limit fields when supplied | Choose Claude. Local CLI logging is used automatically. Setup offers Link Claude quota and safe removal. |
-| Gemini CLI | Reported token totals from recorded CLI JSON/JSONL sessions | No automatic account-quota adapter | Choose Gemini CLI and use it normally with session recording. |
-| GitHub Copilot | Numeric telemetry bridge | No automatic account-quota adapter in this release | Connect usage events from your Copilot SDK application; editor usage is not automatically imported. |
-| Cursor | Numeric telemetry bridge | No automatic personal-quota adapter | Supply cumulative token telemetry from an integration you control. Team Admin API access is a separate capability. |
-| Antigravity | Numeric telemetry bridge | No automatic quota adapter | Supply numeric telemetry. The CLI's interactive quota panel is not treated as a stable machine API. |
-| OpenCode | Numeric SQLite message/session projections | No automatic quota adapter | Select OpenCode and use its client. No monitor key or script is needed for supported local schemas. |
+| Codex | Numeric counters in the local Codex SQLite DB | Official CLI account interface; legacy file fallback | Select Codex; offers CLI install/sign-in ([guide](CODEX_SETUP.md)) |
+| ZCode | Numeric request counters in the local ZCode SQLite DB | Z.AI coding-plan adapter | Select ZCode; optional coding-plan key |
+| Claude Code | `message.usage` fields in CLI JSONL transcripts (deduplicated by message ID) | Statusline bridge, else undocumented OAuth usage | Select Claude; **Agents > Claude quota link** |
+| Gemini CLI | `tokens.total` from recorded CLI sessions | None | Select; use with session recording |
+| OpenCode | Numeric SQLite message/session projections | None | Select; no key or script needed |
+| GitHub Copilot | [Numeric bridge](#external-numeric-bridge) | None | Forward events from your Copilot SDK app |
+| Cursor | Numeric bridge | None (Admin API is team-only) | Supply cumulative token telemetry |
+| Antigravity | Numeric bridge | None | Supply numeric telemetry |
 
-**Agents > Check AI setup** checks selected local sources and prints next steps without model requests or USB writes. The Agents page also exposes provider instructions and optional links. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. NOVA shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
+- **Agents > Check AI setup** lists readable sources and next steps. It sends no model request and no USB write. Selecting a provider does not prove its source is readable.
+- With no real quota percentage, NOVA shows **LOCAL / Activity only**. It never substitutes context occupancy, request counts, billing estimates or invented percentages.
+- Optional lifecycle events (Codex, Claude Code, ZCode only): [Live provider events](LIVE_PROVIDER_EVENTS.md).
 
 ## ZCode
 
-Optional live agent phases are available through **Agents > Provider events**. Choose ZCode,
-leave Remove off and type `LINK`. This uses the [documented process hook interface](https://zcode.z.ai/en/docs/hooks)
-and stores fixed state/timing metadata with hashed identities. Confirm Hooks is enabled
-in ZCode settings and start a new session. Existing global disablement and unrelated
-hooks are preserved. This observer never supplies model context or tool decisions;
-per-subagent lifecycle is not supported by this adapter. The PC's Agent USB line confirms
-transport delivery separately from receipt of a genuine client event.
+**Quota (optional).** Get your own **GLM Coding Plan API key** ([instructions](https://docs.z.ai/devpack/quick-start)), select ZCode, paste it into the masked field and save. LimitBuddy never recovers ZCode's login or asks for your Z.AI password. A blank key means activity only; a saved key is kept unless replaced or cleared.
 
-Use ZCode normally on this PC for local token activity. For quota percentages, obtain your own **GLM Coding Plan API key** from the appropriate plan page in your Z.AI account; [official key instructions](https://docs.z.ai/devpack/quick-start). Select ZCode in **Settings > Edit settings**, paste the key into the masked field and save. The monitor does not recover ZCode's encrypted login or ask for your Z.AI password. Leave the key blank if you only want local activity; an existing saved key is preserved unless explicitly replaced or cleared.
+| Window | Shown as | Provider field |
+| --- | --- | --- |
+| Model, hours | **5 HOURS** | `CREDIT_LIMIT` / `TOKENS_LIMIT`, `unit=3`, normally `number=5` |
+| Model, weeks | **7 DAYS** | same, `unit=6`, normally `number=1` |
+| Monthly MCP tool allowance | **MONTHLY MCP** | `TIME_LIMIT` |
 
-The quota adapter separates model quotas (**5 HOURS / 7 DAYS**) from the monthly MCP tool allowance (**MONTHLY MCP**) when reported. In the provider response, `CREDIT_LIMIT` / `TOKENS_LIMIT` model windows use hours (`unit=3`, normally `number=5`) or weeks (`unit=6`, normally `number=1`); `TIME_LIMIT` is the monthly MCP allowance. A monthly subscription payment is not a monthly token budget. **SET > AI USAGE** explains the windows and key setup, shows each remaining percentage/data status, and saves the selected window. Missing windows remain unavailable even if selected. Keep local configuration private.
+A monthly subscription payment is not a monthly token budget. **SET > AI USAGE** explains the windows, shows each remaining percentage and saves the selected window. Missing windows stay unavailable.
 
-Primary references: [ZCode quota and tool usage](https://zcode.z.ai/en/docs/usage-stats), [Coding Plan usage rules](https://docs.z.ai/devpack/overview), [official usage-query script](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs).
+**Live phases (optional).** **Agents > Provider events**, choose ZCode, leave Remove off, type `LINK`; enable Hooks in ZCode and start a new session. Details: [Live provider events](LIVE_PROVIDER_EVENTS.md).
+
+References: [usage stats](https://zcode.z.ai/en/docs/usage-stats), [Coding Plan rules](https://docs.z.ai/devpack/overview), [usage-query script](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs), [hooks](https://zcode.z.ai/en/docs/hooks).
 
 ## Claude Code
 
-Local activity uses assistant `message.usage` numeric fields from recent default CLI transcripts under `~/.claude/projects/`. Records with the same `message.id` are not counted twice; increases in a streamed record may still be registered later. Inputs, outputs and reported cache tokens are observed counts, not an invoice. CLI versions may omit or incompletely report output usage. Desktop/web sessions have separate storage and are not automatically covered.
+**Activity.** Assistant `message.usage` numbers from recent CLI transcripts under `~/.claude/projects/`. Counts are observed, not an invoice. Some CLI versions omit output usage. Desktop/web sessions are not covered.
 
-For quota display, select Claude Code in **Settings > Edit settings**, save, then open **Agents > Claude quota link**. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
+**Quota.** An API key alone is never a subscription quota. Sources are tried in this order:
 
-If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `limitbuddy --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. To remove an owned link, open **Agents > Claude quota link**, enable Remove and type `LINK`; other settings are preserved. Installing twice is harmless. Each real change keeps a private backup. If another app has replaced the statusline, removal refuses to change it. Source-only checkouts can use `python tools/aim_terminal.py --claude-statusline`.
+```mermaid
+flowchart TD
+    A["Poll Claude quota"] --> B{"Statusline bridge file fresh (5 min)?"}
+    B -->|yes| C["Use bridge: Session and Week"]
+    B -->|no| D{"Credentials file exists?"}
+    D -->|yes| E["OAuth usage, at most every 5 min"]
+    D -->|no| F["Activity only"]
+    E -->|"401, 403, 429 or error"| G["Retry cooldown"]
+```
 
-Primary references: [Claude statusline fields](https://code.claude.com/docs/en/statusline), [CLI session storage](https://code.claude.com/docs/en/sessions), [usage monitoring](https://code.claude.com/docs/en/monitoring-usage). The numeric transcript adapter uses a version-sensitive local format; unsupported records remain unavailable.
+### 1. Statusline bridge (documented, preferred)
+
+1. Select Claude Code in **Settings > Edit settings** and save.
+2. Open **Agents > Claude quota link**; restart Claude Code.
+
+It adds a command to `~/.claude/settings.json` only if no custom statusline exists (backup kept). It extracts only `rate_limits.five_hour` and `rate_limits.seven_day` (used %, reset epoch) into `tools/activity/claude-quota.json`, used while under five minutes old.
+
+> [!NOTE]
+> Claude Code desktop does not run `statusLine`, and `rate_limits` has been missing from the payload since CLI 2.1.138 (also on Max), so the bridge often has nothing.
+
+**Custom statusline:** pipe a copy of its JSON input into `limitbuddy --claude-statusline` (source checkouts: `python tools/aim_terminal.py --claude-statusline`). Context fields (`context_window.used_percentage`, `total_input_tokens`) are never used as plan consumption. **Remove:** Agents > Claude quota link, enable Remove, type `LINK`. Install is idempotent, each change keeps a private backup, and removal refuses if another app replaced the statusline.
+
+### 2. OAuth usage fallback (undocumented)
+
+| Item | Value |
+| --- | --- |
+| Request | `GET https://api.anthropic.com/api/oauth/usage` |
+| Header | `anthropic-beta: oauth-2025-04-20` |
+| Token | Local Claude Code OAuth access token from `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR` honored) |
+| Mapping | `five_hour` = **Session** (300 min), `seven_day` = **Week** (10080 min); `utilization` is already a percentage |
+| Rate | At most one request per 5 min (reply cached); failures back off via the per-provider retry cooldown |
+| Guards | Endpoint allowlisted in `tools/host_security.py`; token read only inside the quota worker subprocess, never logged, stored or passed in arguments; no model turn |
+
+> [!WARNING]
+> This is an approved exception to the documented-sources-only policy. The endpoint is undocumented and may change or vanish. LimitBuddy only reads the existing login; it never asks for, refreshes or copies Claude credentials. Without bridge and credentials, status stays activity-only.
+
+Live lifecycle events are a separate opt-in: [Live provider events](LIVE_PROVIDER_EVENTS.md).
+
+References: [statusline](https://code.claude.com/docs/en/statusline), [sessions](https://code.claude.com/docs/en/sessions), [monitoring](https://code.claude.com/docs/en/monitoring-usage). The transcript format is version-sensitive; unsupported records stay unavailable.
 
 ## Gemini CLI
 
-Recorded sessions live at `~/.gemini/tmp/<project>/chats/session-*`. The adapter supports JSON session files and current JSONL records, retaining only model-message IDs and `tokens.total`. It does not read the local login/token cache. It does not equate context size with the account's remaining quota.
-
-Primary references: [recorded sessions](https://geminicli.com/docs/cli/session-management/), [official token-record types](https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/services/chatRecordingTypes.ts), [official telemetry](https://geminicli.com/docs/cli/telemetry/).
+Reads `~/.gemini/tmp/<project>/chats/session-*` (JSON and JSONL), keeping only model-message IDs and `tokens.total`. The login/token cache is not read, and context size is not treated as quota. References: [sessions](https://geminicli.com/docs/cli/session-management/), [token records](https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/services/chatRecordingTypes.ts), [telemetry](https://geminicli.com/docs/cli/telemetry/).
 
 ## OpenCode
 
-Select OpenCode, save, and use its official local client normally. The reader opens the documented default `~/.local/share/opencode/opencode.db` with SQLite read-only mode. `XDG_DATA_HOME` and a file-valued `OPENCODE_DB` are honored. Custom release-channel paths can be supplied through `OPENCODE_DB`; an in-memory database cannot be monitored.
+Select it, save, use the official client. The reader opens `~/.local/share/opencode/opencode.db` read-only; `XDG_DATA_HOME` and a file-valued `OPENCODE_DB` are honored (in-memory DBs cannot be monitored).
 
-Supported schemas are V1 `message` assistant-token projections and V2 `session_v2` cumulative numeric usage. Only IDs and input/output/reasoning/cache counts are queried; message text and authentication tables are not loaded. IDs are hashed in memory. Queries are bounded and time-limited, and unsupported schemas remain unavailable. V2 imported/new session history is baselined to avoid treating imports as fresh work; subsequent increases animate the companion. Account quota is not inferred from tokens or costs. The existing numeric bridge remains optional for custom integrations.
+- **Schemas:** V1 `message` assistant tokens; V2 `session_v2` cumulative usage. Others stay unavailable.
+- **Queried:** IDs (hashed in memory) and input/output/reasoning/cache counts only. No message text or auth tables. Queries are bounded and time-limited.
+- V2 imported history is baselined, so only later increases animate the companion. Quota is not inferred from tokens or costs.
 
-Primary references: [official database location](https://docs.opencode.ai/docs/cli/), [V1 assistant token schema](https://github.com/anomalyco/opencode/blob/dev/packages/schema/src/v1/session.ts), [V2 numeric projection schema](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/sql.ts), [normalized token semantics](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/usage.ts).
+References: [database location](https://docs.opencode.ai/docs/cli/), [V1 schema](https://github.com/anomalyco/opencode/blob/dev/packages/schema/src/v1/session.ts), [V2 schema](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/sql.ts), [token semantics](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/session/usage.ts).
 
 ## External numeric bridge
 
-Cursor, Copilot and Antigravity need an external integration that reports usage. OpenCode automatically reads its supported local numeric database; an external bridge is an optional alternative. This release does not log into their websites, copy browser cookies or guess private endpoints. Send a JSON record on stdin to the installed terminal command, for example:
+Copilot, Cursor and Antigravity need an integration that reports usage (OpenCode can also use it). LimitBuddy does not log into websites, copy cookies or guess private endpoints. Send a JSON record on stdin:
 
 ```text
 limitbuddy --ingest copilot
-```
-
-Input:
-
-```json
 {"session_id":"your-local-session-id","total_tokens":12345}
 ```
 
-`total_tokens` must be a nonnegative, cumulative integer for that session. The bridge stores only that number, a receive timestamp and a hashed session identifier under ignored `tools/activity/<provider>/`. Prompts, responses, credentials and unrelated fields are discarded. The host detects increases after its startup baseline. The same payload can be supplied with `limitbuddy --ingest cursor`, `limitbuddy --ingest antigravity` or `limitbuddy --ingest opencode`. Source-only checkouts can use `python tools/aim_terminal.py --ingest <provider>`.
+Replace `copilot` with `cursor`, `antigravity` or `opencode`. Source checkouts: `python tools/aim_terminal.py --ingest <provider>`.
 
-Copilot SDK exposes live `assistant.usage` events with input/output token counts, while some events are ephemeral and are not replayed on resume. Accumulate the counts in your SDK application and forward the running total. This does not monitor all VS Code Copilot use automatically. [Official Copilot SDK usage guide](https://github.com/github/copilot-sdk/blob/main/docs/features/usage-and-billing.md).
+- `total_tokens` must be a nonnegative **cumulative** integer per session.
+- Stored under ignored `tools/activity/<provider>/`: that number, a receive time and a hashed session ID. Everything else is discarded.
+- Increases are detected after the host's startup baseline.
 
-Cursor's documented [Admin API](https://docs.cursor.com/en/account/teams/admin-api) is a team-admin interface; it is not assumed to provide a personal real-time quota. Antigravity exposes an [interactive usage command](https://www.antigravity.google/docs/cli/commands/usage/), without an adapter for that service here. [OpenCode SDK](https://docs.opencode.ai/docs/sdk/) provides an integration surface; the external export must be supplied by its user.
+| Provider | Note |
+| --- | --- |
+| Copilot | SDK `assistant.usage` events; some are ephemeral and not replayed on resume. Accumulate in your app and forward the running total. VS Code Copilot is not imported. [Guide](https://github.com/github/copilot-sdk/blob/main/docs/features/usage-and-billing.md) |
+| Cursor | [Admin API](https://docs.cursor.com/en/account/teams/admin-api) is team-admin, not a personal quota |
+| Antigravity | Has an [interactive usage command](https://www.antigravity.google/docs/cli/commands/usage/); no adapter here |
+| OpenCode | [SDK](https://docs.opencode.ai/docs/sdk/) is an optional integration surface |
 
 ## Privacy and limits
 
-SQLite sources are queried read-only. Log adapters parse local records to extract usage; conversation content is never retained, logged or exported by the monitor. Reads, file counts and remembered IDs are bounded, so the display is an activity monitor rather than a complete historical ledger. First samples establish baselines. Missing or malformed sources cannot establish activity. Fresh source reports keep NOVA responsive; token registration can lag generation.
+- SQLite sources are opened read-only. Log adapters extract usage only; conversation content is never retained, logged or exported.
+- Reads, file counts and remembered IDs are bounded: an activity monitor, not a ledger. First samples set baselines; missing or malformed sources cannot establish activity. Token registration can lag generation.
 
-**How often quota is read.** Provider quota is polled every `interval_s` seconds (default and maximum 240, minimum 15). While one of your AIs is registering token use and any quota window is at 30 % left or lower, the host polls about once a minute instead, and returns to the configured interval five minutes after the activity stops. The wait is only ever shortened, the 15 second polling cooldown still applies, and a shorter configured interval is never lengthened. Polling the account usage endpoints does not start model turns or use quota.
+| Polling | Value |
+| --- | --- |
+| `interval_s` | Default and maximum 240 s, minimum 15 s |
+| Fast mode | About once a minute while tokens register and any quota window is at 30 % left or lower; back to the configured interval 5 min after activity stops |
+| Rules | Only ever shortened; 15 s cooldown still applies; polling never starts model turns or uses quota |
+| Claude OAuth | Additionally one request per 5 min |
 
-Use firmware **v1.11.0+** for the additional provider/source flags. If the display has v1.10.x, use the menu's application update before starting those providers. The host rejects unsupported additional-provider firmware with an update message.
+> [!NOTE]
+> Additional providers need firmware **v1.11.0+**. On v1.10.x, use the menu's application update first; the host rejects unsupported firmware with an update message.

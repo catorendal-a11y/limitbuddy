@@ -1,53 +1,41 @@
-# Companion improvements and measured priorities
+# Companion improvements and priorities
 
-The related-project review informs this project; another project's feature list is not a claim
-that its hardware, security or software has been validated here. USB remains the display transport.
+Other projects' feature lists are inspiration, not proof their hardware, security or software was validated here. USB remains the only transport.
 
-## Included in the local v1.19.0 candidate
+## Shipped in v1.19.0 (history; current version in `tools/project_version.py`)
 
-- Provider-specific connection checklist and an observation test without model requests.
-- Optional local numeric history, quota charts and reset-aware consumption estimates.
-- Explicit observational Claude session hooks. Other AIs retain recorded token activity.
-- Family-wide transparent cropping for all six NOVA poses and all six ORBIT poses.
-  Original canvas origins are retained by `CompanionRenderer`; thumbnails and desktop artwork
-  are unchanged. RGB565+A8 frame payload falls from 4,396,320 to 3,349,656 bytes,
-  saving 1,046,664 bytes (23.8%) without dropping nontransparent source pixels.
-- Apply a recovered first brightness load once, while preserving any explicit user change.
-- Report a local reader taking more than 15 seconds. USB and quota polling continue; the app
-  recommends restarting a stalled host, or quitting/reopening a stalled desktop monitor. It does not create replacement
-  threads or claim to recover an indefinitely blocked reader automatically.
-- Include free PSRAM in the bounded device information reply, alongside existing free heap.
-- Contain Windows quota workers and read-only Codex app-server processes in kill-on-close
-  Job Objects before resuming their primary thread. Unconfirmed startup cleanup blocks retry.
-  Normal subprocess descendants remain contained even after their original parent exits.
+| Change | Note |
+| --- | --- |
+| Connection checklist, observation test | No model requests |
+| Local numeric history, quota charts, reset-aware estimates | Optional |
+| Claude session hooks | Explicit, observational; other AIs keep recorded token activity |
+| Family-wide transparent cropping (six poses per built-in companion; measured on NOVA and ORBIT) | RGB565+A8 payload 4,396,320 -> 3,349,656 bytes (-1,046,664, 23.8%), no nontransparent pixels dropped; `CompanionRenderer` keeps canvas origins |
+| First brightness load | Recovered value applied once; explicit user change preserved |
+| Slow local reader (> 15 s) | Reported; USB and quota polling continue; app recommends host restart; no replacement threads |
+| Free PSRAM | Added to the bounded device info reply |
+| Windows Job Objects | Quota workers and read-only Codex app-server in kill-on-close jobs before the primary thread resumes; unconfirmed startup cleanup blocks retry; descendants stay contained |
 
-Cropping reduces flash data; it does not reduce the display framebuffer, prove a runtime RAM
-improvement, or compress/decode frames into PSRAM. Native tests cover both board interfaces and
-pose origins. Real P4 operation and physical S3 validation are separate checks.
+> [!NOTE]
+> Cropping shrinks flash data only: not the framebuffer, no proven runtime RAM gain, no PSRAM decode. Native tests cover both board interfaces and pose origins; real P4 and physical S3 are separate checks.
 
 ## Next reliability work
 
-1. Physical gesture tests: drag out/back in, failed touch read, reordered providers while held.
-2. Long P4 soak: resets, reconnects, free heap/PSRAM trends, touch and backlight behavior.
-3. Verify the packaged Job Object path in a fresh Windows installation. Source-level tests cover
-   exited parents, abrupt owner death, nested jobs, denied assignment and unrelated processes.
-   Non-Windows source installations retain scoped process enumeration. Job Objects control
-   process lifetime; they do not reduce filesystem or network permissions.
-4. Enforceable process deadlines for local readers if bounded I/O still proves insufficient.
+1. Physical gestures: drag out/back in, failed touch read, providers reordered while held.
+2. Long P4 soak: resets, reconnects, heap/PSRAM trends, touch, backlight.
+3. Packaged Job Object path on a fresh Windows install (source tests cover exited parents, abrupt owner death, nested jobs, denied assignment, unrelated processes; non-Windows keeps scoped process enumeration). Jobs control lifetime, not filesystem/network permissions.
+4. Enforceable deadlines for local readers if bounded I/O is not enough.
 
-## Optional extensions requiring separate evaluation
+## Optional, needs separate evaluation
 
-- Additional companion packs with validated sizes, origins and bounded allocation. Compression
-  and PSRAM caching need measurements before committing to a decoder or a storage format.
-- A compact tray quota glance and reset notifications using existing cached observations.
-- Provider incident/status indicators that distinguish account quota from service outages.
-- A safe update checker, then verified downloads. Firmware updates remain a separate user action.
+- More companion packs with validated sizes, origins and bounded allocation; measure compression/PSRAM caching before choosing a decoder or storage format.
+- Reset notifications from cached observations.
+- Provider incident indicators separating quota from outages.
+- Safe update checker, then verified downloads (firmware updates stay a user action).
 
-BLE/C6 transport and approval of AI tool commands from the screen change the security and hardware
-scope substantially. They are not enabled by observational session reporting and are not part of
-this candidate. Graphics acceleration should follow measured rendering bottlenecks, rather than
-the mere availability of P4 hardware features.
+## Out of scope
 
-Related examples: [Desktop Buddy](https://github.com/tech-nickk2/claude-desktop-buddy),
-[CodexBar](https://github.com/steipete/CodexBar) and
-[ESP32 LimitBuddy](https://github.com/tobymarks/esp32-ai-monitor).
+- Bluetooth/C6 transport (USB-only product).
+- On-screen approval of AI tool commands: a much larger security scope, not enabled by observational reporting, not part of this candidate.
+- Graphics acceleration should follow measured bottlenecks, not hardware availability.
+
+Related: [Desktop Buddy](https://github.com/tech-nickk2/claude-desktop-buddy), [CodexBar](https://github.com/steipete/CodexBar), [ESP32 LimitBuddy](https://github.com/tobymarks/esp32-ai-monitor).

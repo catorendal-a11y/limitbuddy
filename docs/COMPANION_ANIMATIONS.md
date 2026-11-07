@@ -1,23 +1,28 @@
 # Companion animation format 2
 
-NOVA and ORBIT now use the same allocation-free animation player above CompanionRenderer and
-the verified P4 LZ4 cache. Working/attention/success/error sequences select multiple existing poses;
-resting/warning/critical remain stable poses. Each mood has its own timing and loop policy. Success
-is nonlooping and holds its final frame. Changing companion or mood restarts the appropriate clip.
-Testing animation is selected only from a fresh explicit TESTING event for a selected provider.
-Token increases never establish testing, task success or other detailed phases.
+All built-in companions share one allocation-free animation player above `CompanionRenderer` and the verified P4 LZ4 cache (sequences in `src/companions/builtin_animation.h`).
 
-The schema separates named image assets from mood sequences. Strict limits are:
+- Working/attention/success/error select several existing poses; resting/warning/critical stay stable poses.
+- Each mood has its own timing and loop policy. Success is non-looping and holds its last frame.
+- Changing companion or mood restarts the clip.
+- Testing animation comes only from a fresh explicit TESTING event for a selected provider. Token increases never imply testing, success or other phases.
 
-- Version exactly 2, RGB565A8, raw or LZ4; at most 8,192 manifest bytes.
-- Up to 16 unique assets, 8 distinct moods and 16 steps per sequence.
-- Each step references an existing asset ID and has a 40–60,000 ms duration.
-- Explicit boolean loop; required fallback mood with a real sequence.
-- One global union crop/origin across all frames, within the existing 430×284 canvas.
-- Exact encoded/decoded SHA-256, encoded-byte limits and decoded width×height×3 bytes.
-- Safe lowercase filenames, no traversal/reserved device names, unknown/duplicate fields rejected.
+## Schema
 
-Example sequence inside `animations`:
+| Field / limit | Value |
+| --- | --- |
+| Version, pixels, codec | exactly 2; RGB565A8; raw or LZ4 |
+| Manifest size | <= 8,192 bytes |
+| Assets / moods / steps per sequence | <= 16 unique / <= 8 distinct / <= 16 |
+| Step | existing asset ID, 40-60,000 ms |
+| Loop, fallback | explicit boolean loop; required fallback mood with a real sequence |
+| Crop / origin | one global union across all frames, inside the 430x284 canvas |
+| Integrity | exact encoded and decoded SHA-256, encoded-byte limits, decoded size = width x height x 3 |
+| Names | safe lowercase filenames; no traversal or reserved device names; unknown/duplicate fields rejected |
+| Top-level fields | version, name, format, codec, fallback, frames, animations |
+| Moods | resting, working, testing, attention, success, error, warning, critical |
+
+`frames` lists each asset: `id`, `file`, size/origin, encoded/decoded byte counts, both hashes.
 
 ```json
 {"mood":"working","loop":true,"frames":[
@@ -27,48 +32,40 @@ Example sequence inside `animations`:
 ]}
 ```
 
-`frames` declares every referenced asset's `id`, `file`, width/height/origin, encoded/decoded byte
-counts and both hashes. Top-level fields are version, name, format, codec, fallback, frames and
-animations. Supported moods: resting, working, testing, attention, success, error, warning, critical.
-
-Parsing publishes only a complete valid manifest. Playback handles clock rollover, skipped UI
-ticks and one-shot completion without allocating, decoding or touching transport. Asset ownership,
-cache pins/hash verification and raw fallback remain in the existing renderer/cache domains.
+Only a complete valid manifest is published. Playback handles clock rollover, skipped ticks and one-shot completion with no allocation, decoding or transport access; asset ownership, pins, hashes and raw fallback stay in the renderer/cache.
 
 ## External packs on P4
 
-Open the desktop **Companions** tab and choose **Import and use pack**. The ZIP must contain
-`manifest.json` and exactly its declared frame files, with optional `LICENSE` and `README.md`.
-Archives are never extracted or executed. Duplicate members/fields, unsafe names, unknown files,
-oversize data, invalid crops, timings, hashes or compressed blocks are rejected before selection.
-The library holds at most 16 packs. **Use built-in companion** restores normal rendering;
-**Remove unused pack** cannot remove the selected pack or the user's original import file.
+```mermaid
+flowchart LR
+  Z["ZIP import (NOVA terminal)"] --> V["Validate: members, hashes, crops"]
+  V --> S["PC store: tools/companions/ (max 16 packs)"]
+  S -->|"pack_begin / chunk / finish"| B["Inactive RAM bank (2 MiB)"]
+  B -->|"all hashes and sizes OK"| U["UI owner adopts: bank becomes active"]
+  B -.->|"rejected or incomplete"| P["Previous pack kept"]
+```
 
-The original archive/notices and a verified content-addressed payload stay under the PC app's
-`tools/companions/` directory, excluded from Git and release source exports. The host restores the
-selected pack after a display restart. Durable storage is on the PC; the display holds its current
-pack in RAM. No display filesystem formatting, NVS image storage or microSD is required.
+1. In the NOVA terminal open **4 Device > Companion packs**, choose **Import and use pack**, type `IMPORT`.
+2. The ZIP must hold `manifest.json` and exactly its declared frame files, plus optional `LICENSE` and `README.md`. Archives are never extracted or executed. Duplicate members/fields, unsafe names, unknown files, oversize data, invalid crops, timings, hashes or compressed blocks are rejected before selection.
+3. **Use built-in companion** restores normal rendering. **Remove unused pack** cannot remove the selected pack or the user's original import file.
 
-P4 reserves two 2 MiB encoded banks and one bounded frame-validation buffer at startup. Staging
-cannot overwrite the active bank. Every asset's encoded/decoded hash and exact decoded size is
-checked before publication. The UI owner detaches the old LVGL/cache binding before switching
-banks. The existing two-slot cache retains image pins and its raw built-in fallback; rendering
-does not allocate. The bank/scratch allocation adds about 4.35 MiB of reserved PSRAM, separately
-from the existing decoded frame cache. Allocation failure leaves built-in rendering available.
+| Item | Detail |
+| --- | --- |
+| Durable store | PC `tools/companions/` (original archive/notices + verified content-addressed payload); git-ignored, excluded from release exports; host restores the selected pack after display restart |
+| Display | current pack in RAM only; no display filesystem formatting, NVS image storage or microSD |
+| P4 startup reservation | two 2 MiB encoded banks + one bounded frame-validation buffer (~4.35 MiB PSRAM, separate from the decoded frame cache) |
+| Activation | staging never overwrites the active bank; UI owner detaches the old LVGL/cache binding before switching |
+| Failure | allocation failure leaves built-in rendering available |
 
-Transfers use bounded `pack_*` commands through the existing serial owner, with boot ID, random
-transaction nonce, exact offsets, receipts and timeout. A complete transfer is not reported active
-until the UI owner adopts it. Failed or incomplete replacements retain the previous companion.
-Pressing a built-in companion on the display overrides the pack; the host reports that override
-rather than immediately reinstalling it. Use the desktop selection to restore the external pack.
-S3 does not advertise external runtime support.
+- Transfers use bounded `pack_*` commands through the existing serial owner, with boot ID, random transaction nonce, exact offsets, receipts and timeout.
+- A complete transfer is not active until the UI owner adopts it. Failed or incomplete replacements keep the previous companion.
+- Pressing a built-in companion on the display overrides the pack; the host reports the override rather than reinstalling. Restore the pack from the desktop selection.
+- S3 does not advertise external runtime support.
 
-Original example packs can be exported reproducibly with:
+## Export original example packs
 
 ```text
 python scripts/build_companion_packages.py --output work/companion-packs
 ```
 
-This uses the committed original NOVA/ORBIT pixels and animation timings, pinned LZ4 block
-compression, exact hashes and the unchanged original MIT notice. It does not copy provider logos
-or grant trademark rights. Source/native tests are distinct from physical rendering evidence.
+Exports only NOVA and ORBIT (`--output` is the sole option) from committed original pixels and timings, pinned LZ4 compression, exact hashes and the unchanged MIT notice. No provider logos, no trademark rights. Native tests are not physical rendering evidence.
