@@ -1,3 +1,20 @@
+# LimitBuddy v1.19.1-rc27
+
+## Choose what the display shows
+
+- **CARDS** on the home screen (and in Settings): tap an AI to hide or show it, and pick **1, 2 or 3**
+  cards for home and **1, 2 or 4** for the USAGE page. Hidden AIs still raise alerts; hiding every AI
+  shows them all.
+- **One home card shows more:** every quota window with its percentage, bar and reset countdown, plus the
+  session state or how fresh the data is.
+
+## Fixes
+
+- The Claude login no longer needs Claude Code to be opened: the host renews it through the official CLI.
+  Without the CLI the card now says so instead of "check login".
+- Updated GitHub Actions (checkout 7, setup-python 7, upload-artifact 7, download-artifact 8,
+  attest-build-provenance 4) and psutil, platformdirs and websockets.
+
 # LimitBuddy v1.19.1-rc26
 
 ## Claude quota is back

@@ -1,6 +1,6 @@
 # Windows installation and terminal trust
 
-1. Download `nova-v1.19.1-rc26-windows-x64-terminal.zip` and `SHA256SUMS.txt` from this repository's Releases.
+1. Download `nova-v1.19.1-rc27-windows-x64-terminal.zip` and `SHA256SUMS.txt` from this repository's Releases.
 2. Compare the ZIP's SHA-256 with the checksum.
 3. Extract the complete archive into a permanent writable folder.
 4. Double-click **Install-LimitBuddy.cmd** (verifies the bundled runtime, registers `limitbuddy` for the current user), open a new terminal, run `limitbuddy`.

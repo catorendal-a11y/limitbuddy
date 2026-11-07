@@ -4,7 +4,7 @@ NOVA is the PC application: type `limitbuddy` and it runs in the current termina
 
 ## Install on Windows
 
-1. Download `nova-v1.19.1-rc26-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc26).
+1. Download `nova-v1.19.1-rc27-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc27).
 2. Extract it into a permanent writable folder and keep it there.
 3. Double-click **Install-LimitBuddy.cmd**: it verifies the bundled runtime and registers only this user's `limitbuddy` command. No administrator access.
 4. Open a new terminal in any folder and run `limitbuddy`.

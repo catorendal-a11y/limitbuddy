@@ -1,7 +1,7 @@
 # Agent integration audit
 
 > [!NOTE]
-> Historical. 2026-10-15, installed app and P4 firmware v1.19.1-rc2 (the **rc2 baseline**; current is v1.19.1-rc26). Rc3 added ZCode hooks, an independent live reader, setup-definition checks, legacy Codex wrapper migration and visible USB delivery health (RELEASE_NOTES.md). Not current behavior.
+> Historical. 2026-10-15, installed app and P4 firmware v1.19.1-rc2 (the **rc2 baseline**; current is v1.19.1-rc27). Rc3 added ZCode hooks, an independent live reader, setup-definition checks, legacy Codex wrapper migration and visible USB delivery health (RELEASE_NOTES.md). Not current behavior.
 
 Quota readiness, token activity, lifecycle events, USB acknowledgment and permission control are independent capabilities. At rc2, live monitoring was not established for all three providers.
 

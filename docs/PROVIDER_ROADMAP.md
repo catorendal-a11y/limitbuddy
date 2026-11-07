@@ -1,7 +1,7 @@
 # Provider expansion plan
 
 > [!NOTE]
-> Plan, not a claim that bridge-only providers work automatically. Current: v1.19.1-rc26 (baseline v1.12.0). Eight selectable tools, no first-run defaults. Capabilities: [PROVIDERS.md](PROVIDERS.md).
+> Plan, not a claim that bridge-only providers work automatically. Current: v1.19.1-rc27 (baseline v1.12.0). Eight selectable tools, no first-run defaults. Capabilities: [PROVIDERS.md](PROVIDERS.md).
 
 Start a task with `docs/PROVIDERS.md`, this plan and the relevant step. One reviewable PR per step. Python suite for host changes; firmware build plus `scripts/run_tests.py --ui` for firmware/UI.
 
