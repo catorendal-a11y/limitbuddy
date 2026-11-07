@@ -751,7 +751,7 @@ class ProviderTests(unittest.TestCase):
             self.assertEqual(host.claude_quota(panel, None), (rows, None))
         fetch.assert_called_once()
         with patch.object(host, 'fetch_claude', return_value=(None, 'Claude: rate limited; retrying')) as fetch, \
-                patch.object(host.time, 'monotonic', return_value=panel.claude_quota[0] + host.CLAUDE_MIN_FETCH_SECONDS):
+                patch.object(host.time, 'monotonic', return_value=panel.claude_quota[0] + host.CLAUDE_MIN_FETCH_SECONDS + 1):
             self.assertEqual(host.claude_quota(panel, None), (None, 'Claude: rate limited; retrying'))
 
     def test_oversized_codex_auth_is_rejected_before_network(self):
