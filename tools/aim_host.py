@@ -22,7 +22,6 @@ import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 from token_activity import TokenReporter, TokenSampler
 from host_status import HostStatus, OPTIONS, FLAGS, validate_options
@@ -39,72 +38,24 @@ import subprocess
 import threading
 from process_runtime import ChildCleanupError, start_child, stop_child
 from project_version import HOST_VERSION, numeric_version
+from quota_common import (MAX_RESPONSE_BYTES, CredentialError, credential, read_json_response, window_minutes, provider_failure, now_iso_epoch, percent_value, ProviderNotice, retry_after_seconds, http_notice, reset_display, zai_reset_iso, reset_seconds)
+from quota_codex import CODEX_AUTH, fetch_codex
+from quota_claude import (CLAUDE_MIN_FETCH_SECONDS, CLAUDE_RENEW_MARGIN_MS, CLAUDE_USAGE_URL, CLAUDE_WINDOWS,
+                          claude_command, claude_credentials, claude_oauth, claude_reset_iso, fetch_claude,
+                          note_claude_fields, renew_claude_login)
+from quota_zcode import fetch_zcode
 
 import serial
 from serial.tools import list_ports
 
 HERE = Path(sys.executable).resolve().parent / "tools" if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 CONFIG_PATH = HERE / "aim_host.json"
-CODEX_AUTH = codex_home() / 'auth.json'
 MAX_FRAME_BYTES = 4095
 MIN_INTERVAL_SECONDS = 15
 MAX_INTERVAL_SECONDS = 240  # the panel marks quota STALE after aim::kQuotaStaleMs
 CYCLE_DEADLINE_SECONDS = 45
 ACK_TIMEOUT_SECONDS = 5  # one slow acknowledgement must not tear down the USB link
 HEARTBEAT_SECONDS = 10
-MAX_RESPONSE_BYTES = 65536
-
-
-class CredentialError(ValueError):
-    pass
-
-
-def credential(value, optional=False):
-    if not isinstance(value, str):
-        raise CredentialError("Invalid credential format")
-    value = value.strip()
-    if not value and optional:
-        return ""
-    if not value or any(not 33 <= ord(character) <= 126 for character in value):
-        raise CredentialError("Credentials must be a single printable token")
-    return value
-
-
-def read_json_response(response):
-    raw = response.read(MAX_RESPONSE_BYTES + 1)
-    if len(raw) > MAX_RESPONSE_BYTES:
-        raise ValueError("API response exceeds size limit")
-    data = json.loads(raw.decode("utf-8-sig"))
-    if not isinstance(data, dict):
-        raise ValueError("API response must be an object")
-    return data
-
-
-def window_minutes(seconds):
-    if seconds is None:
-        return 0
-    if isinstance(seconds, bool):
-        raise ValueError("Invalid window duration")
-    seconds = float(seconds)
-    if not math.isfinite(seconds) or seconds < 0 or seconds / 60 > 0xffffffff:
-        raise ValueError("Invalid window duration")
-    return int(seconds // 60)
-
-
-def provider_failure(provider, error):
-    # Header/JSON exceptions may contain credentials or server response text.
-    # Return a category without copying exception details to the display/log.
-    if isinstance(error, CredentialError):
-        return f"{provider}: invalid login or API key"
-    if isinstance(error, FileNotFoundError):
-        return f"{provider}: login file not found"
-    if isinstance(error, (ValueError, TypeError, KeyError, AttributeError)):
-        return f"{provider}: invalid response data"
-    if isinstance(error, OSError):
-        return f"{provider}: connection failed; retrying"
-    return f"{provider}: request failed; retrying"
-
-
 LOG_PATH = HERE / "aim_host.log"
 _log_lock = threading.Lock()
 
@@ -222,46 +173,6 @@ def load_config():
     return out
 
 
-def now_iso_epoch(epoch_s):
-    return datetime.fromtimestamp(epoch_s, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def percent_value(value):
-    if value is None or isinstance(value, bool):
-        raise ValueError("Missing usage percentage")
-    number = float(value)
-    if not math.isfinite(number) or number < 0:
-        raise ValueError("Invalid usage percentage")
-    return number
-
-
-class ProviderNotice(str):
-    def __new__(cls, message, retry_after=0):
-        value = super().__new__(cls, message)
-        value.retry_after = retry_after
-        return value
-
-
-def retry_after_seconds(headers):
-    value = headers.get("Retry-After") if headers else None
-    if not isinstance(value, str):
-        return 0
-    try:
-        seconds = int(value) if value.strip().isdigit() else math.ceil(parsedate_to_datetime(value).timestamp() - time.time())
-        return max(0, min(86400, seconds))
-    except (ValueError, TypeError, OverflowError, OSError):
-        return 0
-
-
-def http_notice(provider, error):
-    delay = retry_after_seconds(error.headers)
-    if error.code in (401, 403):
-        return ProviderNotice(f"{provider}: check login or API key", delay)
-    if error.code == 429:
-        return ProviderNotice(f"{provider}: rate limited; retrying", delay)
-    return ProviderNotice(f"{provider}: HTTP {error.code}; retrying", delay)
-
-
 class ProviderRetries:
     """Monotonic, independent cooldowns survive USB reconnections."""
     def __init__(self, interval=240):
@@ -285,307 +196,11 @@ class ProviderRetries:
         self.states.pop(provider, None)
 
 
-def reset_display(value, minutes=0):
-    """Use the PC's local timezone, retaining dates for long quota windows."""
-    if not value:
-        return ""
-    try:
-        reset = datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone()
-    except (ValueError, TypeError, AttributeError):
-        return str(value)[:19]
-    return reset.strftime("%d %b %H:%M" if minutes >= 1440 else "%H:%M")
-
-
-def zai_reset_iso(value):
-    if not value:
-        return ""
-    try:
-        milliseconds = float(value)
-    except (ValueError, TypeError):
-        return str(value)
-    try:
-        return now_iso_epoch(milliseconds / 1000.0)
-    except (ValueError, OverflowError, OSError):
-        return ""
-
-
-def clock_fields():
-    local = datetime.now().astimezone()
-    return {
-        "time": local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "displayTime": local.strftime("%H:%M"),
-        "displaySeconds": local.second,
-        "tzOffsetMinutes": int(local.utcoffset().total_seconds() // 60),
-    }
-
-
-def reset_seconds(value, epoch_now=None):
-    if not isinstance(value, str) or "T" not in value:
-        return None
-    try:
-        reset = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if reset.tzinfo is None:
-            return None
-        remaining = math.ceil(reset.timestamp() - (time.time() if epoch_now is None else epoch_now))
-        return max(0, min(0xffffffff - 60, remaining))
-    except (ValueError, OverflowError, OSError):
-        return None
-
-
 # ───────────────────────────────────────────────────────────────────────────────
 # PROVIDER FETCHES - each returns (rows, notice) or None on failure
 # ───────────────────────────────────────────────────────────────────────────────
 
 
-def fetch_codex():
-    """Codex (ChatGPT plan) usage via the local Codex CLI login token."""
-    command = codex_command()
-    if command:
-        try:
-            data = read_rate_limits(command)
-            buckets = data.get('rateLimitsByLimitId')
-            limit = buckets.get('codex') if isinstance(buckets, dict) else None
-            if limit is None: limit = data.get('rateLimits')
-            if not isinstance(limit, dict) or limit.get('limitId') not in (None, 'codex'):
-                raise ValueError('No supported Codex quota bucket')
-            rows = []
-            for key, title in [('primary','Session'),('secondary','Secondary')]:
-                window = limit.get(key)
-                if window is None: continue
-                if not isinstance(window, dict): raise ValueError('Invalid Codex window')
-                minutes = window.get('windowDurationMins')
-                if minutes is None: minutes = 0
-                if type(minutes) is not int or not 0 <= minutes <= 0xffffffff: raise ValueError('Invalid window duration')
-                reset = window.get('resetsAt')
-                percent = min(100.0, percent_value(window.get('usedPercent')))
-                rows.append({'title':'Week' if key == 'secondary' and minutes == 10080 else title,
-                             'usedPercent':percent,
-                             'windowMinutes':minutes, 'resetsAt':now_iso_epoch(reset) if reset is not None else ''})
-            if not rows: return None, 'Codex: no plan quota; sign in to CLI with ChatGPT'
-            return rows, None
-        except Exception:
-            return None, 'Codex: quota unavailable; retry setup or update the official CLI'
-    try:
-        auth = read_local_json(CODEX_AUTH)
-        access = (auth.get("tokens") or {}).get("access_token")
-        if not access:
-            return None, "Codex: no access_token in auth.json"
-        access = credential(access)
-        req = urllib.request.Request("https://chatgpt.com/backend-api/wham/usage")
-        req.add_header("Authorization", "Bearer " + access)
-        req.add_header("User-Agent", "LimitBuddy/" + numeric_version(HOST_VERSION))
-        with open_provider_request(req) as r:
-            data = read_json_response(r)
-        rl = data.get("rate_limit") or {}
-        rows = []
-        pw = rl.get("primary_window") or {}
-        if pw:
-            rows.append({
-                "title": "Session",
-                "usedPercent": percent_value(pw.get("used_percent")),
-                "resetsAt": now_iso_epoch(pw["reset_at"]) if pw.get("reset_at") else "",
-                "windowMinutes": window_minutes(pw.get("limit_window_seconds")),
-            })
-        sw = rl.get("secondary_window") or {}
-        if sw:
-            minutes = window_minutes(sw.get("limit_window_seconds"))
-            rows.append({
-                "title": "Week" if minutes == 10080 else "Secondary",
-                "usedPercent": percent_value(sw.get("used_percent")),
-                "resetsAt": now_iso_epoch(sw["reset_at"]) if sw.get("reset_at") else "",
-                "windowMinutes": minutes,
-            })
-        if not rows:
-            return None, "Codex: no rate_limit windows in response"
-        return rows, None
-    except urllib.error.HTTPError as error:
-        return None, http_notice("Codex", error)
-    except Exception as e:
-        return None, provider_failure("Codex", e)
-
-
-CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
-CLAUDE_MIN_FETCH_SECONDS = 300  # The undocumented endpoint rate-limits aggressively.
-CLAUDE_RENEW_MARGIN_MS = 10 * 60 * 1000
-CLAUDE_RENEW_TIMEOUT_SECONDS = 10
-
-
-def claude_credentials():
-    return config_root() / ".credentials.json"
-
-
-def claude_reset_iso(value):
-    if value is None:
-        return ""
-    if not isinstance(value, str) or len(value) > 64:
-        raise ValueError("Invalid reset time")
-    moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if moment.tzinfo is None:
-        raise ValueError("Reset time lacks a timezone")
-    return now_iso_epoch(moment.timestamp())
-
-
-def claude_command():
-    local = Path.home() / ".local/bin" / ("claude.exe" if os.name == "nt" else "claude")
-    for candidate in (path_executable("claude.exe" if os.name == "nt" else "claude"), str(local)):
-        if candidate and allowed_executable(candidate):
-            return candidate
-    return None
-
-
-def renew_claude_login():
-    """Let the official Claude Code CLI renew its own login file; no model turn, no output kept."""
-    command = claude_command()
-    if not command:
-        return False
-    try:
-        subprocess.run([command, "auth", "status"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL, timeout=CLAUDE_RENEW_TIMEOUT_SECONDS, check=False,
-                       creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
-    except (OSError, subprocess.SubprocessError):
-        pass  # The request below then reports the expired login.
-    return True
-
-
-def claude_oauth():
-    auth = read_local_json(claude_credentials())
-    oauth = auth.get("claudeAiOauth") if isinstance(auth, dict) else None
-    return oauth if isinstance(oauth, dict) else {}
-
-
-# Model-specific weekly limits follow the shared ones; the panel keeps the first three reported.
-CLAUDE_WINDOWS = (("five_hour", "Session", 300), ("seven_day", "Week", 10080),
-                  ("seven_day_opus", "Opus week", 10080), ("seven_day_sonnet", "Sonnet week", 10080))
-_claude_fields_seen = set()
-
-
-def note_claude_fields(data):
-    """Log the names (never values) of unparsed usage fields once, so new limits can be supported later."""
-    if not isinstance(data, dict):
-        return
-    known = {name for name, _, _ in CLAUDE_WINDOWS}
-    fields = sorted(str(key)[:40] for key, value in data.items()
-                    if key not in known and value not in (None, [], {}) and key not in _claude_fields_seen)
-    if fields:
-        _claude_fields_seen.update(fields)
-        LOG("claude: unparsed usage fields: " + ", ".join(fields[:12]))
-
-
-def fetch_claude():
-    """Claude plan quota via the local Claude Code OAuth login (read-only; token stays in memory)."""
-    try:
-        cli_missing = False
-        oauth = claude_oauth()
-        expires = oauth.get("expiresAt")
-        # Claude Code desktop does not rewrite this file, so its 8-hour token lapses unless the CLI renews it.
-        if type(expires) in (int, float) and expires - time.time() * 1000 < CLAUDE_RENEW_MARGIN_MS:
-            cli_missing = not renew_claude_login()
-            oauth = claude_oauth()
-        access = credential(oauth.get("accessToken"))
-        req = urllib.request.Request(CLAUDE_USAGE_URL)
-        req.add_header("Authorization", "Bearer " + access)
-        req.add_header("anthropic-beta", "oauth-2025-04-20")
-        req.add_header("User-Agent", "LimitBuddy/" + numeric_version(HOST_VERSION))
-        with open_provider_request(req) as r:
-            data = read_json_response(r)
-        rows = []
-        note_claude_fields(data)
-        for name, title, minutes in CLAUDE_WINDOWS:
-            window = data.get(name)
-            if window is None:
-                continue
-            if not isinstance(window, dict):
-                raise ValueError("Invalid quota window")
-            if window.get("utilization") is None:
-                continue
-            # utilization is already a percentage (4.0 means 4 %), never a fraction.
-            rows.append({"title": title, "usedPercent": percent_value(window["utilization"]),
-                         "resetsAt": claude_reset_iso(window.get("resets_at")), "windowMinutes": minutes})
-        if not rows:
-            return None, "Claude: no plan quota in response"
-        return rows[:3], None  # the panel protocol carries three windows
-    except urllib.error.HTTPError as error:
-        if cli_missing and error.code in (401, 403):
-            return None, ProviderNotice("Claude: login expired; install the Claude Code CLI to renew it",
-                                        retry_after_seconds(error.headers))
-        return None, http_notice("Claude", error)
-    except Exception as e:
-        return None, provider_failure("Claude", e)
-
-
-def fetch_zcode(api_key):
-    """Z.AI GLM coding plan quota. Auth: raw key, NO Bearer prefix."""
-    try:
-        api_key = credential(api_key)
-        req = urllib.request.Request("https://api.z.ai/api/monitor/usage/quota/limit")
-        req.add_header("Authorization", api_key.strip())
-        req.add_header("Accept-Language", "en-US,en")
-        with open_provider_request(req) as r:
-            data = read_json_response(r)
-        success, code = data.get("success"), data.get("code")
-        if success is not None and type(success) is not bool:
-            raise ValueError("Invalid success flag")
-        accepted_code = type(code) is int and code in (0, 200)
-        accepted = success is not False and (success is True or accepted_code) and (code is None or accepted_code)
-        if not accepted:
-            code = data.get("code")
-            if type(code) is int and code in (401, 403):
-                return None, "Z.AI: check login or API key"
-            if type(code) is int and code == 429:
-                return None, "Z.AI: rate limited; retrying"
-            return None, "Z.AI: request rejected"
-        limits = ((data.get("data") or {}).get("limits")) or []
-        rows = []
-        for lim in limits:
-            quota_type = lim.get("type")
-            if quota_type not in ("CREDIT_LIMIT", "TOKENS_LIMIT", "TIME_LIMIT"):
-                continue
-            unit = lim.get("unit")
-            # The provider's official usage plugin distinguishes monthly MCP
-            # calls (TIME_LIMIT) from model quotas. Unit 6 is a weekly model
-            # window, not a month; unit 3 is hours (normally number=5).
-            if quota_type == "TIME_LIMIT":
-                title, minutes = "Monthly MCP", 43200
-            elif type(unit) is int and unit in (3, 6):
-                number = lim.get("number", 5 if unit == 3 else 1)
-                if type(number) is not int or number < 1:
-                    raise ValueError("Invalid quota window length")
-                minutes = number * (60 if unit == 3 else 10080)
-                if minutes > 0xffffffff:
-                    raise ValueError("Invalid quota window length")
-                title = "Session" if minutes == 300 else "Week" if minutes == 10080 else "Quota"
-            elif quota_type == "TOKENS_LIMIT" and unit is None:
-                title, minutes = "Session", 300  # legacy official plugin format
-            else:
-                title, minutes = "Quota", 0
-            percentage = lim.get("percentage")
-            if percentage is None and quota_type == "TIME_LIMIT":
-                used, total = lim.get("currentValue"), lim.get("usage")
-                if (type(used) not in (int, float) or type(total) not in (int, float)
-                        or not math.isfinite(used) or not math.isfinite(total)
-                        or used < 0 or total <= 0):
-                    raise ValueError("Invalid MCP quota counts")
-                percentage = 100 * used / total
-            reset = lim.get("nextResetTime") or lim.get("resetAt")
-            reset_iso = zai_reset_iso(reset)
-            rows.append({
-                "title": title,
-                "usedPercent": percent_value(percentage),
-                "resetsAt": reset_iso,
-                "windowMinutes": minutes,
-            })
-        if not rows:
-            return None, "Z.AI: no quota entries"
-        return rows, None
-    except urllib.error.HTTPError as error:
-        return None, http_notice("Z.AI", error)
-    except Exception as e:
-        return None, provider_failure("Z.AI", e)
-
-
-# ───────────────────────────────────────────────────────────────────────────────
-# PANEL LINK (esp32-ai-monitor protocol)
-# ───────────────────────────────────────────────────────────────────────────────
 def find_port(preferred, board_id='guition-p4'):
     if preferred and preferred != "auto":
         return preferred
@@ -1082,6 +697,16 @@ def wait_connected(panel, seconds, minimum_wait=0):
             next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
 
 
+def clock_fields():
+    local = datetime.now().astimezone()
+    return {
+        "time": local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "displayTime": local.strftime("%H:%M"),
+        "displaySeconds": local.second,
+        "tzOffsetMinutes": int(local.utcoffset().total_seconds() // 60),
+    }
+
+
 def frame_payload(provider, view_index, rows, notice=None):
     data0 = {"source": "aim-host", "provider": provider, "fetching": False, "viewIndex": view_index}
     if notice:
@@ -1360,8 +985,26 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
                     pass  # The PC dashboard copy is advisory; the display frame was already acknowledged.
         history = getattr(panel, 'history', None)
         if history is not None and rows and not notice: history.record_quota(provider, rows)
-        LOG(f"{provider}: frame {frame_id} ACK")
+        note_ack(panel, provider, frame_id)
     return frame_id
+
+
+ACK_SUMMARY_SECONDS = 3600
+_acks = {'panel': None, 'seen': set(), 'count': 0, 'since': 0.0}
+
+
+def note_ack(panel, provider, frame_id):
+    """Log each provider's first acknowledgement per connection, then one summary an hour."""
+    now = time.monotonic()
+    if _acks['panel'] is not panel:
+        _acks.update(panel=panel, seen=set(), count=0, since=now)
+    _acks['count'] += 1
+    if provider not in _acks['seen']:
+        _acks['seen'].add(provider)
+        LOG(f"{provider}: frame {frame_id} ACK")
+    elif now - _acks['since'] >= ACK_SUMMARY_SECONDS:
+        LOG(f"display acknowledged {_acks['count']} frames in the last hour")
+        _acks.update(count=0, since=now)
 
 
 def main():

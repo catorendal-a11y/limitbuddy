@@ -17,6 +17,9 @@ host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
 
 
+import quota_claude
+import quota_codex
+import quota_common
 class PortSelectionTests(unittest.TestCase):
     def test_multiple_boards_require_explicit_port(self):
         ports = [Mock(device="COM4", vid=0x303A), Mock(device="COM6", vid=0x303A)]
@@ -636,7 +639,7 @@ class ProviderTests(unittest.TestCase):
             {"type": "CREDIT_LIMIT", "unit": 6, "number": 1, "percentage": 60},
             {"type": "TIME_LIMIT", "percentage": 12, "currentValue": 12, "usage": 100},
         ]}})
-        with patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(quota_common, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(notice)
         self.assertEqual([(row["title"], row["windowMinutes"]) for row in rows],
@@ -648,7 +651,7 @@ class ProviderTests(unittest.TestCase):
             with self.subTest(limit=limit):
                 context = self.response({"success": True, "data": {"limits": [
                     {"type": "TIME_LIMIT", "currentValue": 12, "usage": limit}]}})
-                with patch.object(host, "open_provider_request", return_value=context):
+                with patch.object(quota_common, "open_provider_request", return_value=context):
                     rows, notice = host.fetch_zcode("test-key")
                 if expected is None:
                     self.assertIsNone(rows)
@@ -658,12 +661,12 @@ class ProviderTests(unittest.TestCase):
                     self.assertEqual(rows[0]["usedPercent"], expected)
 
     def setUp(self):
-        legacy = patch.object(host, 'codex_command', return_value=None)
+        legacy = patch.object(quota_codex, 'codex_command', return_value=None)
         legacy.start(); self.addCleanup(legacy.stop)
     def test_explicit_rejection_does_not_accept_success_code(self):
         context = self.response({"success": False, "code": 200, "data": {"limits": [
             {"type": "CREDIT_LIMIT", "unit": 3, "percentage": 25}]}})
-        with patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(quota_common, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertTrue(notice)
@@ -671,8 +674,8 @@ class ProviderTests(unittest.TestCase):
     def test_missing_duration_is_unknown_and_daily_secondary_is_not_called_week(self):
         context = self.response({"rate_limit": {"primary_window": {"used_percent": 12},
             "secondary_window": {"used_percent": 25, "limit_window_seconds": 86400}}})
-        with patch.object(host, 'read_local_json', return_value={'tokens': {'access_token': 'test-token'}}), \
-                patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(quota_common, 'read_local_json', return_value={'tokens': {'access_token': 'test-token'}}), \
+                patch.object(quota_common, "open_provider_request", return_value=context):
             rows, notice = host.fetch_codex()
         self.assertIsNone(notice)
         self.assertEqual(rows[0]["windowMinutes"], 0)
@@ -682,8 +685,8 @@ class ProviderTests(unittest.TestCase):
     def test_claude_oauth_usage_maps_percentages_and_sends_beta_header(self):
         context = self.response({"five_hour": {"utilization": 4.0, "resets_at": "2026-11-07T15:00:00.123456+00:00"},
                                  "seven_day": {"utilization": 0.5, "resets_at": None}, "limits": []})
-        with patch.object(host, 'read_local_json', return_value={'claudeAiOauth': {'accessToken': 'test-token'}}), \
-                patch.object(host, "open_provider_request", return_value=context) as request:
+        with patch.object(quota_common, 'read_local_json', return_value={'claudeAiOauth': {'accessToken': 'test-token'}}), \
+                patch.object(quota_common, "open_provider_request", return_value=context) as request:
             rows, notice = host.fetch_claude()
         self.assertIsNone(notice)
         sent = request.call_args.args[0]
@@ -697,10 +700,10 @@ class ProviderTests(unittest.TestCase):
                  "seven_day_opus": None, "seven_day_sonnet": {"utilization": 30},
                  "extra_usage": {"secret_value": 99}, "limits": [{"x": 1}]}
         logged = []
-        with patch.object(host, 'read_local_json', return_value={'claudeAiOauth': {'accessToken': 'test-token'}}), \
-                patch.object(host, '_claude_fields_seen', set()), patch.object(host, 'LOG', logged.append):
+        with patch.object(quota_common, 'read_local_json', return_value={'claudeAiOauth': {'accessToken': 'test-token'}}), \
+                patch.object(quota_claude, '_claude_fields_seen', set()), patch.object(quota_claude, 'LOG', logged.append):
             for _ in range(2):
-                with patch.object(host, "open_provider_request", return_value=self.response(reply)):
+                with patch.object(quota_common, "open_provider_request", return_value=self.response(reply)):
                     rows, notice = host.fetch_claude()
         self.assertIsNone(notice)
         self.assertEqual([(r["title"], r["windowMinutes"]) for r in rows],
@@ -708,12 +711,26 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(logged, ["claude: unparsed usage fields: extra_usage, limits"])
         self.assertNotIn("99", "".join(logged))
 
+    def test_acknowledgements_are_logged_once_per_connection_then_hourly(self):
+        logged, clock = [], {'now': 1000.0}
+        first, second = object(), object()
+        with patch.object(host, 'LOG', logged.append), patch.object(host.time, 'monotonic', side_effect=lambda: clock['now']), \
+                patch.dict(host._acks, {'panel': None}):
+            for frame in range(3):
+                host.note_ack(first, 'codex', frame); host.note_ack(first, 'claude', frame)
+            self.assertEqual(logged, ['codex: frame 0 ACK', 'claude: frame 0 ACK'])
+            clock['now'] += host.ACK_SUMMARY_SECONDS
+            host.note_ack(first, 'codex', 9)
+            self.assertEqual(logged[-1], 'display acknowledged 7 frames in the last hour')
+            host.note_ack(second, 'codex', 10)                      # a new connection logs again
+            self.assertEqual(logged[-1], 'codex: frame 10 ACK')
+
     def test_claude_oauth_usage_rejects_missing_token_and_empty_windows(self):
         for auth, reply in (({}, None), ({'claudeAiOauth': {'accessToken': 'bad\ntoken'}}, None),
                             ({'claudeAiOauth': {'accessToken': 'test-token'}}, {"five_hour": None, "seven_day": None}),
                             ({'claudeAiOauth': {'accessToken': 'test-token'}}, {"five_hour": {"utilization": "x"}})):
-            with self.subTest(auth=auth, reply=reply), patch.object(host, 'read_local_json', return_value=auth), \
-                    patch.object(host, "open_provider_request", return_value=self.response(reply or {})) as request:
+            with self.subTest(auth=auth, reply=reply), patch.object(quota_common, 'read_local_json', return_value=auth), \
+                    patch.object(quota_common, "open_provider_request", return_value=self.response(reply or {})) as request:
                 rows, notice = host.fetch_claude()
             self.assertIsNone(rows); self.assertTrue(notice)
             if reply is None: request.assert_not_called()
@@ -727,9 +744,9 @@ class ProviderTests(unittest.TestCase):
             stale = {'claudeAiOauth': {'accessToken': 'old-token', 'expiresAt': expires}}
             fresh = {'claudeAiOauth': {'accessToken': 'new-token', 'expiresAt': now_ms + 8 * 3600_000}}
             with self.subTest(renews=renews), patch.object(host.time, 'time', return_value=now_ms / 1000), \
-                    patch.object(host, 'read_local_json', side_effect=[stale, fresh]), \
-                    patch.object(host, 'renew_claude_login') as renew, \
-                    patch.object(host, "open_provider_request", return_value=self.response(reply)) as request:
+                    patch.object(quota_common, 'read_local_json', side_effect=[stale, fresh]), \
+                    patch.object(quota_claude, 'renew_claude_login') as renew, \
+                    patch.object(quota_common, "open_provider_request", return_value=self.response(reply)) as request:
                 rows, notice = host.fetch_claude()
             self.assertIsNone(notice)
             self.assertEqual(renew.called, renews)
@@ -737,14 +754,14 @@ class ProviderTests(unittest.TestCase):
             self.assertEqual(sent, "Bearer " + ("new-token" if renews else "old-token"))
 
     def test_claude_renewal_runs_fixed_status_command_without_output(self):
-        with patch.object(host, 'claude_command', return_value='C:/claude.exe'), \
+        with patch.object(quota_claude, 'claude_command', return_value='C:/claude.exe'), \
                 patch.object(host.subprocess, 'run') as run:
             host.renew_claude_login()
         args, kwargs = run.call_args
         self.assertEqual(args[0], ['C:/claude.exe', 'auth', 'status'])
         self.assertIs(kwargs['stdout'], host.subprocess.DEVNULL)
-        self.assertEqual(kwargs['timeout'], host.CLAUDE_RENEW_TIMEOUT_SECONDS)
-        with patch.object(host, 'claude_command', return_value=None), patch.object(host.subprocess, 'run') as run:
+        self.assertEqual(kwargs['timeout'], quota_claude.CLAUDE_RENEW_TIMEOUT_SECONDS)
+        with patch.object(quota_claude, 'claude_command', return_value=None), patch.object(host.subprocess, 'run') as run:
             self.assertFalse(host.renew_claude_login())
         run.assert_not_called()
 
@@ -752,9 +769,9 @@ class ProviderTests(unittest.TestCase):
         import urllib.error
         expired = {'claudeAiOauth': {'accessToken': 'old-token', 'expiresAt': 1}}
         error = urllib.error.HTTPError(host.CLAUDE_USAGE_URL, 401, 'Unauthorized', {}, None)
-        with patch.object(host, 'read_local_json', return_value=expired), \
-                patch.object(host, 'renew_claude_login', return_value=False), \
-                patch.object(host, 'open_provider_request', side_effect=error):
+        with patch.object(quota_common, 'read_local_json', return_value=expired), \
+                patch.object(quota_claude, 'renew_claude_login', return_value=False), \
+                patch.object(quota_common, 'open_provider_request', side_effect=error):
             rows, notice = host.fetch_claude()
         self.assertIsNone(rows)
         self.assertIn('install the Claude Code CLI', notice)
@@ -774,13 +791,13 @@ class ProviderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'auth.json'
             path.write_bytes(b'x' * 65537)
-            with patch.object(host, 'CODEX_AUTH', path), patch.object(host, 'open_provider_request') as request:
+            with patch.object(quota_codex, 'CODEX_AUTH', path), patch.object(quota_common, 'open_provider_request') as request:
                 rows, notice = host.fetch_codex()
             self.assertIsNone(rows); self.assertTrue(notice)
             request.assert_not_called()
 
     def test_invalid_key_never_reaches_network(self):
-        with patch.object(host, "open_provider_request") as request:
+        with patch.object(quota_common, "open_provider_request") as request:
             rows, notice = host.fetch_zcode("private-key\nInjected: header")
         request.assert_not_called()
         self.assertIsNone(rows)
@@ -808,7 +825,7 @@ class ProviderTests(unittest.TestCase):
         return context
 
     def test_exception_messages_do_not_expose_credentials(self):
-        with patch.object(host, "open_provider_request", side_effect=ValueError("Invalid header: private-key")):
+        with patch.object(quota_common, "open_provider_request", side_effect=ValueError("Invalid header: private-key")):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertNotIn("private-key", notice)
@@ -816,7 +833,7 @@ class ProviderTests(unittest.TestCase):
     def test_unknown_window_is_not_falsely_labelled_as_five_hours(self):
         context = self.response({"success": True, "data": {"limits": [
             {"type": "CREDIT_LIMIT", "unit": 99, "percentage": 25}]}})
-        with patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(quota_common, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(notice)
         self.assertEqual(rows[0]["title"], "Quota")
@@ -837,7 +854,7 @@ class ProviderTests(unittest.TestCase):
 
     def test_rejection_message_from_server_is_not_forwarded_verbatim(self):
         context = self.response({"success": False, "code": 401, "msg": "private-key"})
-        with patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(quota_common, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertNotIn("private-key", notice)
@@ -855,7 +872,7 @@ class ProviderTests(unittest.TestCase):
         context.__exit__ = Mock(return_value=False)
         auth = Mock()
         auth.read_text.return_value = '{"tokens":{"access_token":"test-token"}}'
-        with patch.object(host, "CODEX_AUTH", auth), patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(quota_codex, "CODEX_AUTH", auth), patch.object(quota_common, "open_provider_request", return_value=context):
             rows, notice = host.fetch_codex()
         self.assertIsNone(rows)
         self.assertTrue(notice)
@@ -867,7 +884,7 @@ class ProviderTests(unittest.TestCase):
         context = Mock()
         context.__enter__ = Mock(return_value=response)
         context.__exit__ = Mock(return_value=False)
-        with patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(quota_common, "open_provider_request", return_value=context):
             rows, notice = host.fetch_zcode("test-key")
         self.assertIsNone(rows)
         self.assertTrue(notice)

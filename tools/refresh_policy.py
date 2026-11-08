@@ -1,13 +1,14 @@
 """When to poll provider quota next. Pure timing policy: no I/O, no provider or USB access.
 
-The configured interval stays the ceiling. While you are using an AI and a quota window is
-low, the number changes quickly and a value several minutes old misleads, so polling speeds up.
+The configured interval stays the ceiling. While you are using an AI the numbers move, so
+polling speeds up to every two minutes, and to every minute when a quota window is low.
 """
 import time
 
 ACTIVE_SECONDS = 300   # token use this recently counts as working
 LOW_PERCENT = 30       # same threshold the terminal colors amber
 FAST_SECONDS = 60      # polite floor for the fast mode; the configured minimum is 15
+ACTIVE_POLL_SECONDS = 120  # while working with a comfortable quota
 
 
 def effective_interval(base, remaining, idle_seconds):
@@ -15,7 +16,7 @@ def effective_interval(base, remaining, idle_seconds):
     if idle_seconds is None or idle_seconds > ACTIVE_SECONDS:
         return base
     if remaining is None or remaining > LOW_PERCENT:
-        return base
+        return min(base, ACTIVE_POLL_SECONDS)
     return min(base, FAST_SECONDS)
 
 

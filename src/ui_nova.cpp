@@ -167,7 +167,16 @@ static void move_page(int step) {
 static void next_page(lv_event_t*) { move_page(1); }
 // Swipe left for the next provider page, right for the previous one.
 static void swipe(lv_dir_t direction) { if (direction == LV_DIR_LEFT) move_page(1); else if (direction == LV_DIR_RIGHT) move_page(-1); }
-static void gesture(lv_event_t*) { if (auto* input = lv_indev_active()) swipe(lv_indev_get_gesture_dir(input)); }
+static void gesture(lv_event_t*) {
+  auto* input = lv_indev_active();
+  if (!input) return;
+  const auto direction = lv_indev_get_gesture_dir(input);
+  const uint8_t before = page;
+  swipe(direction);
+  if (page == before) return;
+  for (const auto& item : providers)
+    if (!lv_obj_is_hidden(item.card)) ui_interaction::slide_in(item.card, ui_interaction::slide_from(direction));
+}
 static void details(lv_event_t* event) {
   auto* card = static_cast<ProviderCard*>(lv_event_get_user_data(event));
   if (!card || ui_interaction::swiped()) return;

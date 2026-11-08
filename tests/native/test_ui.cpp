@@ -65,6 +65,7 @@ static uint8_t testInitialBrightness = 160;
 } } while (false)
 
 uint32_t millis() { return fakeTick; }
+lv_obj_t* idle_dim_warm_overlay();   // src/ui/idle_dim.cpp: the night veil
 // A home card status names its window and may append the reset; AUTO only where expected.
 static bool status_is(lv_obj_t* label, const std::string& window) {
   const std::string text = lv_label_get_text(label);
@@ -1418,6 +1419,11 @@ int main(int argc, char** argv) {
   swipe_cards(LV_DIR_LEFT); CHECK(currentPage == 0);
   swipe_cards(LV_DIR_TOP); CHECK(currentPage == 0);                                    // vertical swipes do nothing
   swipe_cards(LV_DIR_LEFT); dashboard_update(); CHECK(currentPage == 1);
+  CHECK(lv_obj_is_hidden(pageLabel) && !lv_obj_is_hidden(pageArrow));               // dots replace the page text
+  for (size_t d = 0; d < aim::kMaxViews; ++d) {
+    CHECK(lv_obj_is_hidden(pageDots[d]) == (d >= pageCount));
+    if (d < pageCount) { CHECK(lv_obj_get_width(pageDots[d]) == (d == currentPage ? 18 : 6)); check_inside(pageButton, pageDots[d]); }
+  }
   sample.automaticViews = true;
   sample.viewIntervalSeconds = 2;
   sample.activeView = 2;
@@ -1734,6 +1740,8 @@ int main(int argc, char** argv) {
   idle_dim_update(); fakeTick += 300; idle_dim_update();
   CHECK(actualBrightness > brightness_raw(15) && actualBrightness < selectedBrightness);
   CHECK(std::string(idle_dim_mode()) == "NIGHT");
+  CHECK(idle_dim_warm_overlay() && !lv_obj_is_hidden(idle_dim_warm_overlay()));           // warm night veil
+  CHECK(lv_obj_get_parent(idle_dim_warm_overlay()) == lv_layer_sys() && !lv_obj_is_clickable(idle_dim_warm_overlay()));
   fakeTick += 300; idle_dim_update(); ui_settings_update();
   CHECK(std::string(lv_label_get_text(actualBrightnessLabel)) == "Actual 15 % / NIGHT");
   check_readable_text(actualBrightnessLabel);
@@ -1743,6 +1751,8 @@ int main(int argc, char** argv) {
     lv_obj_get_coords(actualBrightnessLabel,&actualBounds);lv_obj_get_coords(connectTarget,&connectBounds);
     CHECK(actualBounds.y2<connectBounds.y1);
   }
+  nightSettings.enabled = false; idle_dim_update();
+  CHECK(lv_obj_is_hidden(idle_dim_warm_overlay()));                                  // the veil leaves with the night
   screenshot(screenshots, "settings-actual-night");
   idle_dim_touch(true);
   CHECK(actualBrightness == selectedBrightness && std::string(idle_dim_mode()) == "NORMAL");
@@ -1909,8 +1919,10 @@ int main(int argc, char** argv) {
   close_appearance(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "ORBIT");
   CHECK(lv_image_get_src(nova_ui::figure) == &nova_assets::orbit_work || lv_image_get_src(nova_ui::figure) == &nova_assets::orbit_blink);
+  nightSettings.enabled = false; idle_dim_update();                                  // measure colours without the night veil
   screenshot(screenshots, "orbit-ocean");
   CHECK((framebuffer[93 * 800 + 50] & 0xffffffu) == ui_theme::surface);   // top of the stage; the floor takes a mood tint
+  nightSettings.enabled = true; idle_dim_update();
   dashboard_show(); dashboard_update();
   CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "ORBIT");
   screenshot(screenshots, "dashboard-ocean");

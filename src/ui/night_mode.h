@@ -10,6 +10,10 @@ inline bool night_scheduled(uint16_t minute, const app_settings::NightSettings& 
   return settings.start < settings.end ? minute >= settings.start && minute < settings.end :
                                         minute >= settings.start || minute < settings.end;
 }
+inline bool night_active(const aim::Snapshot& snapshot, uint32_t now, const app_settings::NightSettings& settings) {
+  uint16_t minute = 0;
+  return local_minutes(snapshot, now, minute) && night_scheduled(minute, settings);
+}
 inline uint8_t night_brightness(const aim::Snapshot& snapshot, uint32_t now, uint8_t selected,
                                const app_settings::NightSettings& settings) {
   uint16_t minute = 0;

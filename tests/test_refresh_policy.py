@@ -1,4 +1,4 @@
-"""Quota polling follows activity: fast while you use an AI with a low quota, slow when idle."""
+"""Quota polling follows activity: faster while you use an AI, fastest with a low quota, slow when idle."""
 from pathlib import Path
 import sys
 import unittest
@@ -24,9 +24,10 @@ class EffectiveIntervalTests(unittest.TestCase):
         for idle in (None, ACTIVE + 1, 10_000):
             self.assertEqual(effective_interval(240, LOW - 5, idle), 240)
 
-    def test_activity_with_a_comfortable_quota_keeps_the_configured_interval(self):
-        self.assertEqual(effective_interval(240, LOW + 1, 5), 240)
-        self.assertEqual(effective_interval(240, None, 5), 240)
+    def test_activity_with_a_comfortable_quota_polls_every_two_minutes(self):
+        self.assertEqual(effective_interval(240, LOW + 1, 5), refresh_policy.ACTIVE_POLL_SECONDS)
+        self.assertEqual(effective_interval(240, None, 5), refresh_policy.ACTIVE_POLL_SECONDS)
+        self.assertEqual(effective_interval(90, LOW + 1, 5), 90)
 
     def test_activity_with_a_low_quota_polls_faster(self):
         self.assertEqual(effective_interval(240, LOW, 5), FAST)

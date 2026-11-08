@@ -7,6 +7,7 @@ import ssl
 import sys
 import unicodedata
 import urllib.error
+import urllib.parse
 import urllib.request
 
 PROVIDER_ENDPOINTS = frozenset((
@@ -29,6 +30,30 @@ def open_provider_request(request):
     context = ssl.create_default_context()
     opener = urllib.request.build_opener(RejectRedirects(), urllib.request.HTTPSHandler(context=context))
     return opener.open(request, timeout=20)
+
+
+# Published releases only: the release list and assets of this repository. Downloads carry no
+# credentials, and GitHub may redirect an asset only to its own asset hosts over HTTPS.
+UPDATE_RELEASES_URL = 'https://api.github.com/repos/catorendal-a11y/limitbuddy/releases?per_page=10'
+UPDATE_DOWNLOAD_PREFIX = 'https://github.com/catorendal-a11y/limitbuddy/releases/download/'
+UPDATE_ASSET_HOSTS = frozenset(('release-assets.githubusercontent.com', 'objects.githubusercontent.com'))
+
+
+class UpdateRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target = urllib.parse.urlsplit(newurl)
+        if target.scheme != 'https' or target.hostname not in UPDATE_ASSET_HOSTS:
+            raise urllib.error.HTTPError(req.full_url, code, 'Update redirect blocked', headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def open_update_request(url):
+    if url != UPDATE_RELEASES_URL and not (url.startswith(UPDATE_DOWNLOAD_PREFIX) and '..' not in url):
+        raise ValueError('Unsupported update address')
+    request = urllib.request.Request(url, headers={'User-Agent': 'LimitBuddy-updater',
+                                                   'Accept': 'application/vnd.github+json' if url == UPDATE_RELEASES_URL else 'application/octet-stream'})
+    opener = urllib.request.build_opener(UpdateRedirects(), urllib.request.HTTPSHandler(context=ssl.create_default_context()))
+    return opener.open(request, timeout=30)
 
 
 def allowed_executable(path):

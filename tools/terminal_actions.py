@@ -136,6 +136,22 @@ class TerminalActions:
                 result['activation']='Display: selected companion is not confirmed.'
             else:result['activation']='Display: '+safe_text(companion.get('state','unconfirmed'),30)
         elif action=='log':result['log']=desktop.recent_log(self.root,tuple(secrets))
+        elif action=='doctor':
+            import doctor
+            emit(doctor.render(doctor.run(self.root)))
+        elif action in ('check_update','install_update'):
+            import self_update
+            from project_version import HOST_VERSION
+            if action=='install_update':require(values.get('confirm'),'UPDATE')
+            try:
+                release=self_update.check()
+                if release is None:emit('LimitBuddy is up to date ('+HOST_VERSION+').')
+                elif action=='check_update':
+                    emit(release['tag']+' is available'+(' (pre-release)' if release['prerelease'] else '')+'. Use Install update.')
+                else:
+                    staged=self_update.stage(self.root,release,emit=emit)
+                    self_update.finish(self.root,staged,emit=emit);result['exit']=True
+            except self_update.UpdateError as error:emit(str(error))
         elif action=='connect_pc':
             require(values.get('confirm'),'CONNECT')
             if self.comparison is None:raise ValueError('Physical code comparison is unavailable')

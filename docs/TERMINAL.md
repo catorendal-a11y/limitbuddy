@@ -19,6 +19,7 @@ Setup does not select providers, sign into an AI account, flash hardware or enab
 | --- | --- |
 | `limitbuddy --version`, `--help` | Command information |
 | `limitbuddy --check` | Renders synthetic data; does **not** test USB or providers |
+| `limitbuddy --check-update` | Says whether a newer published release exists |
 | **1-5** | Pages |
 | **Tab / Enter** | Controls |
 | **R** | Reload local metadata |
@@ -31,6 +32,8 @@ Source launcher: `AI-Monitor-Terminal.bat` (`AI-Monitor.bat` is an alias).
 - Claude quota comes from your local Claude Code login or the optional statusline bridge; otherwise Claude shows activity only.
 - Opening or refreshing the dashboard never starts a model request or a second USB owner.
 - Invalid settings stay in the form; secret fields are masked and unchanged keys are preserved.
+- **Device / Doctor** shows one OK / FIX list: settings, host, USB, firmware version, Start at sign-in, the `limitbuddy` command, provider hooks and quota, and the Claude login expiry. It is read-only and prints no keys or tokens.
+- When the display firmware differs from the host, **Device** and **Overview** say so; update it with **Firmware > Application update**.
 - **Device / Firmware > Application update** writes only the application partition after exact board identification and confirmation. **First installation** resets display settings. Source-only downloads contain no firmware: use the release ZIP or build per [DEVELOPMENT.md](DEVELOPMENT.md). Physical permissions stay disabled; S3 is experimental.
 
 ## Start at Windows sign-in
@@ -41,7 +44,19 @@ Off by default. **Settings > Edit settings** adds one `LimitBuddy` value to the 
 - If another program already uses the name `LimitBuddy`, Save stops with a message and changes nothing.
 - A host that cannot start at sign-in (for example an unplugged display) just waits for USB.
 
-## Upgrade and migrate
+## Update in place
+
+**Settings > Check for update** looks for a newer published release on GitHub. **Install update** (type `UPDATE`) downloads it, checks it against the release's `SHA256SUMS.txt`, extracts it beside this folder as `<folder>.next`, stops the host and closes NOVA. A small PowerShell step then moves your private files (`tools\aim_host.json`, `tools\activity`, companion packs, logs, `.env`) into the new version, renames this folder to `<folder>.previous` and puts the new version in its place, then starts the host again if it was running.
+
+- The folder path stays the same, so provider hooks (and their Codex trust), the Start at sign-in entry and the `limitbuddy` command keep working.
+- Only this repository's releases and GitHub's asset hosts are contacted; downloads carry no credentials.
+- If anything fails, the old folder is put back and keeps working. The result is in `%TEMP%\limitbuddy-update.log` and on **Device / Doctor**.
+- Update the display afterwards with **Device > Firmware > Application update**.
+- Available in the Windows package; a Git checkout updates with Git.
+
+## Upgrade and migrate (older versions)
+
+Versions before in-place update move by hand once. Use a stable folder such as `%LOCALAPPDATA%\Programs\NOVA Terminal\app`, so later updates keep the same path.
 
 1. Extract the new release to a **new** permanent folder and run its `Install-LimitBuddy.cmd` (retargets `limitbuddy`).
 2. Stop the old host (**Settings > Stop host**).

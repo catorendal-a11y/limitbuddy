@@ -27,7 +27,7 @@ Scope: PC companion, official-client setup, USB input, local configuration, prov
 
 ## Addendum: Claude plan quota endpoint (v1.19.1-rc26)
 
-The host also calls the undocumented `GET https://api.anthropic.com/api/oauth/usage` (`fetch_claude` in `tools/aim_host.py`). The three allowlisted endpoints are the Codex and Z.AI URLs plus this one.
+The host also calls the undocumented `GET https://api.anthropic.com/api/oauth/usage` (`fetch_claude` in `tools/quota_claude.py`). The three allowlisted endpoints are the Codex and Z.AI URLs plus this one.
 
 | Aspect | Rule |
 | --- | --- |
@@ -39,5 +39,18 @@ The host also calls the undocumented `GET https://api.anthropic.com/api/oauth/us
 | Rate | Successful reply reused for 5 minutes (`CLAUDE_MIN_FETCH_SECONDS`); undocumented endpoint may change or rate-limit; failures show a quota notice |
 | Residual | Same-account processes can already read `.credentials.json`; this adds no access but makes the monitor a token consumer. No model turn is started |
 | Tests | `tests/test_aim_host.py`: headers, percentage mapping, missing token, renewal only near expiry, fixed renewal command, 5-minute reuse, with synthetic tokens. Tests never call the real endpoint; it was checked once on the owner's ESP32-P4 with the owner's login, without printing token or reply |
+
+## Addendum: in-place update channel
+
+**Settings > Install update** (`tools/self_update.py`, `tools/apply_update.ps1`) is a separate, credential-free channel.
+
+| Aspect | Rule |
+| --- | --- |
+| Addresses | Only `UPDATE_RELEASES_URL` (this repository's release list) and assets under `UPDATE_DOWNLOAD_PREFIX`; redirects only to `release-assets.githubusercontent.com` or `objects.githubusercontent.com` over HTTPS (`open_update_request` in `tools/host_security.py`) |
+| Integrity | The package must match its line in the same release's `SHA256SUMS.txt`. This detects corruption, not a compromised GitHub account; build provenance attestations remain the stronger manual check (`gh attestation verify`) |
+| Bounds | 1 MB release list, 200 MB package, 800 MB extracted, 20 000 entries; only regular files under the package folder; absolute, `..`, backslash, drive and link entries are rejected |
+| Swap | Runs after NOVA exits, from a copied script in `%TEMP%`, with explicit `-Root`/`-Staged` arguments; refuses any staged folder other than `<root>.next` with its marker. Private files are moved (keeping their current-user DACLs), never copied or uploaded. Failure restores the old folder |
+| Scope | Windows package only; no administrator rights, service or scheduled task |
+| Tests | `tests/test_self_update.py`: version order, release selection, address and redirect allowlists, checksum mismatch, unsafe archives, foreign staging folders, and a real PowerShell swap on temporary folders |
 
 References: [HTTPRedirectHandler](https://docs.python.org/3/library/urllib.request.html#urllib.request.HTTPRedirectHandler), [shutil.which](https://docs.python.org/3/library/shutil.html#shutil.which).

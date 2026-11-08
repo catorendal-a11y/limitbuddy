@@ -215,7 +215,10 @@ static char footServicesCache[24] = {0};
 static char hintCache[96] = {0};
 static uint32_t footDotColor = 0;
 static lv_obj_t* pageButton = nullptr;
-static lv_obj_t* pageLabel = nullptr;
+static lv_obj_t* pageLabel = nullptr;     // "1 / 2 >" kept for screen readers and tests; dots are shown
+static lv_obj_t* pageArrow = nullptr;
+static lv_obj_t* pageDots[aim::kMaxViews] = {};
+static uint8_t dotsPage = UINT8_MAX, dotsCount = UINT8_MAX;
 static uint8_t currentPage = 0, pageCount = 1;
 static uint32_t lastPageMs = 0, viewRevision = UINT32_MAX;
 // bar value/color cache slots: stable index per (layout, card, row)
@@ -514,7 +517,19 @@ static void move_page(int step) {
 static void next_page_cb(lv_event_t*) { move_page(1); }
 // Swipe left for the next card page, right for the previous one.
 static void swipe_cards(lv_dir_t direction) { if (direction == LV_DIR_LEFT) move_page(1); else if (direction == LV_DIR_RIGHT) move_page(-1); }
-static void gesture_cb(lv_event_t*) { if (auto* input = lv_indev_active()) swipe_cards(lv_indev_get_gesture_dir(input)); }
+void dashboard_update();
+static void gesture_cb(lv_event_t*) {
+  auto* input = lv_indev_active();
+  if (!input) return;
+  const auto direction = lv_indev_get_gesture_dir(input);
+  const uint8_t before = currentPage;
+  swipe_cards(direction);
+  if (currentPage == before) return;
+  dashboard_update();   // draw the new page first, then let it glide in
+  for (auto* cards : {big, compact})
+    for (size_t i = 0; i < (cards == big ? kBigCards : kCompactCards); ++i)
+      if (cards[i].card && !lv_obj_is_hidden(cards[i].card)) ui_interaction::slide_in(cards[i].card, ui_interaction::slide_from(direction));
+}
 
 static void open_card_cb(lv_event_t* event) {
   const auto* card = static_cast<CardWidgets*>(lv_event_get_user_data(event));
@@ -641,6 +656,16 @@ void dashboard_init() {
   ui_interaction::keep_target(pageButton);
   pageLabel = make_label(pageButton, 0, 0, 70, F_META, C_TITLE, LV_TEXT_ALIGN_CENTER, "1 / 2 >");
   lv_obj_center(pageLabel);
+  lv_obj_set_hidden(pageLabel, true);
+  pageArrow = make_label(pageButton, 118, 0, 22, F_META, C_TITLE, LV_TEXT_ALIGN_CENTER, ">");
+  lv_obj_align(pageArrow, LV_ALIGN_RIGHT_MID, -10, 0);
+  for (auto*& dot : pageDots) {
+    dot = lv_obj_create(pageButton); lv_obj_set_size(dot, 6, 6);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0); lv_obj_set_style_border_width(dot, 0, 0);
+    lv_obj_set_style_pad_all(dot, 0, 0); lv_obj_set_scrollable(dot, false); lv_obj_set_clickable(dot, false);
+    lv_obj_set_hidden(dot, true);
+  }
+  dotsPage = dotsCount = UINT8_MAX;
   lv_obj_set_state(pageButton, LV_STATE_DISABLED, true);
 
   for (auto& cache : bigCache) cache = CardCaches{};
@@ -1004,6 +1029,20 @@ void dashboard_update() {
     char text[16];
     snprintf(text, sizeof(text), "%u / %u >", currentPage + 1u, pageCount);
     if (strcmp(lv_label_get_text(pageLabel), text) != 0) lv_label_set_text(pageLabel, text);
+  }
+  if (dotsPage != currentPage || dotsCount != pageCount) {
+    // Page dots: the current page is a wider accent pill, the same language as the home screen.
+    dotsPage = currentPage; dotsCount = pageCount;
+    int x = 4;
+    for (size_t d = 0; d < aim::kMaxViews; ++d) {
+      const bool shown = d < pageCount, active = d == currentPage;
+      lv_obj_set_hidden(pageDots[d], !shown);
+      if (!shown) continue;
+      lv_obj_set_width(pageDots[d], active ? 18 : 6);
+      lv_obj_align(pageDots[d], LV_ALIGN_LEFT_MID, x, 0);
+      lv_obj_set_style_bg_color(pageDots[d], lv_color_hex(active ? ui_theme::accent : ui_theme::muted), 0);
+      x += (active ? 18 : 6) + 6;
+    }
   }
   const size_t start = currentPage * perPage;
   const size_t onPage = std::min(perPage, used - std::min(start, used));

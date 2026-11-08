@@ -11,6 +11,8 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import aim_host as host
+import quota_codex
+import quota_common
 import codex_support as codex
 from telemetry_bridge import ingest
 from token_activity import TokenReporter
@@ -40,7 +42,7 @@ class NoRemoteExecutionTests(unittest.TestCase):
         panel, serial = self.panel(messages)
         with patch.object(codex.subprocess, 'Popen') as spawn, \
                 patch.object(codex.subprocess, 'run') as run, patch.object(host.os, 'system') as shell, \
-                patch.object(host, 'open_provider_request') as network, patch.object(Path, 'write_text') as write:
+                patch.object(quota_common, 'open_provider_request') as network, patch.object(Path, 'write_text') as write:
             self.assertEqual(panel.wait_for('ack', frame_id=7), {'type': 'ack', 'frameId': 7})
         for action in (spawn, run, shell, network, write): action.assert_not_called()
         self.assertIsNone(panel.refresh_request_id)
@@ -51,7 +53,7 @@ class NoRemoteExecutionTests(unittest.TestCase):
                                      'command': MARKER, 'url': 'https://attacker.invalid/'}])
         with patch.object(codex.subprocess, 'Popen') as spawn, \
                 patch.object(codex.subprocess, 'run') as run, patch.object(host.os, 'system') as shell, \
-                patch.object(host, 'open_provider_request') as network:
+                patch.object(quota_common, 'open_provider_request') as network:
             panel.collect_requests()
         for action in (spawn, run, shell, network): action.assert_not_called()
         self.assertEqual(panel.take_refresh_request(), 8)
@@ -65,7 +67,7 @@ class NoRemoteExecutionTests(unittest.TestCase):
                 'success': True, 'execute': MARKER,
                 'data': {'command': MARKER, 'limits': [{'type': 'CREDIT_LIMIT', 'unit': 3,
                                                        'percentage': percent, 'command': MARKER}]}}).encode()
-            with patch.object(host, 'open_provider_request') as network, \
+            with patch.object(quota_common, 'open_provider_request') as network, \
                     patch.object(codex.subprocess, 'Popen') as spawn, \
                     patch.object(codex.subprocess, 'run') as run, patch.object(host.os, 'system') as shell:
                 network.return_value.__enter__.return_value = response
@@ -85,7 +87,7 @@ class NoRemoteExecutionTests(unittest.TestCase):
         process = Mock(pid=123456); process.stdin = RetainedBuffer()
         process.stdout = RetainedBuffer(b''.join(json.dumps(item).encode() + b'\n' for item in incoming))
         process.poll.side_effect = [None,None,0]
-        with patch.object(host, 'codex_command', return_value=['official-client-fixture']), \
+        with patch.object(quota_codex, 'codex_command', return_value=['official-client-fixture']), \
                 patch.object(codex, 'start_child', return_value=process) as spawn, \
                 patch.object(codex.subprocess, 'run') as run, patch.object(host.os, 'system') as shell, \
                 patch('process_runtime.psutil.Process', return_value=Mock(children=Mock(return_value=[]))):

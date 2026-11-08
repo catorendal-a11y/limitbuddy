@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import codex_support as support
 import aim_control as control
 import aim_host as host
+import quota_codex
 from token_activity import TokenReporter
 
 
@@ -142,7 +143,7 @@ class CodexOnboardingTests(unittest.TestCase):
         result={'rateLimits':{'primary':{'usedPercent':99}},'rateLimitsByLimitId':{'codex':{
             'limitId':'codex','primary':{'usedPercent':12,'windowDurationMins':300,'resetsAt':2000000000},
             'secondary':{'usedPercent':25,'windowDurationMins':10080,'resetsAt':2000100000}}}}
-        with patch.object(host,'codex_command',return_value=['official-cli']), patch.object(host,'read_rate_limits',return_value=result), \
+        with patch.object(quota_codex,'codex_command',return_value=['official-cli']), patch.object(quota_codex,'read_rate_limits',return_value=result), \
                 patch.object(host.urllib.request,'urlopen') as legacy:
             rows,notice=host.fetch_codex()
         self.assertIsNone(notice); self.assertEqual(rows[0]['usedPercent'],12); self.assertEqual(rows[1]['title'],'Week')
@@ -150,16 +151,16 @@ class CodexOnboardingTests(unittest.TestCase):
 
     def test_cli_error_text_is_not_exposed_and_invalid_percent_is_not_clamped_into_quota(self):
         for result in [RuntimeError('private server detail'), {'rateLimits':{'primary':{'usedPercent':float('nan')}}}]:
-            with patch.object(host,'codex_command',return_value=['official-cli']), \
-                    patch.object(host,'read_rate_limits',side_effect=result if isinstance(result,Exception) else None,
+            with patch.object(quota_codex,'codex_command',return_value=['official-cli']), \
+                    patch.object(quota_codex,'read_rate_limits',side_effect=result if isinstance(result,Exception) else None,
                                  return_value=result if not isinstance(result,Exception) else None):
                 rows,notice=host.fetch_codex()
             self.assertIsNone(rows); self.assertNotIn('private server detail',notice)
 
     def test_over_quota_codex_percentage_reports_zero_remaining_without_setup_error(self):
         result = {'rateLimits':{'primary':{'usedPercent':200,'windowDurationMins':300}}}
-        with patch.object(host, 'codex_command', return_value=['official-cli']), \
-                patch.object(host, 'read_rate_limits', return_value=result):
+        with patch.object(quota_codex, 'codex_command', return_value=['official-cli']), \
+                patch.object(quota_codex, 'read_rate_limits', return_value=result):
             rows, notice = host.fetch_codex()
         self.assertIsNone(notice)
         self.assertEqual(rows[0]['usedPercent'], 100)

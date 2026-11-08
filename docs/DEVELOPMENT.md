@@ -155,7 +155,7 @@ After a firmware build fetches ArduinoJson/LVGL, native tests need a C++17 compi
 | No token reaction | Check the app updates the supported database; allow time for usage registration; inspect numeric diagnostics. Quota fetching alone is not consumption. |
 | API errors | Check CLI login / local Z.AI credential; share only redacted status text, never auth files. |
 | Upload cannot open port | Stop the companion and other serial clients. |
-| Odd brightness | SET shows selected/actual brightness and NORMAL / NIGHT / IDLE; check schedule and idle timeout. |
+| Odd brightness | SET shows selected/actual brightness and NORMAL / NIGHT / IDLE; check schedule and idle timeout. Night hours also add a faint warm veil. |
 
 ## Assets, licensing, contributions
 

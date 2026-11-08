@@ -134,6 +134,8 @@ def device_panel(device,connection):
     connected=device.get('connected',False)
     text.append('● Connected' if connected else '○ Unconfirmed',style=GREEN if connected else MUTED)
     text.append('\nFirmware : '+device.get('firmware','Unknown'),style=MUTED)
+    from doctor import firmware_matches
+    if firmware_matches(device.get('firmware')) is False:text.append('  update available',style='bold #ffaa00')
     age=device.get('sync_age')
     text.append('\nLast sync: '+('Unknown' if age is None else f'{age}s ago'),style=MUTED)
     return text

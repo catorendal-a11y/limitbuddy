@@ -8,6 +8,7 @@ import os
 from rich.console import Group
 from rich.text import Text
 from project_version import HOST_VERSION
+from doctor import firmware_matches
 from provider_catalog import PROVIDERS
 from textual.app import App,ComposeResult
 from textual.binding import Binding
@@ -123,11 +124,13 @@ class TerminalApp(App):
             with TabPane('4 Device',id='device'):
                 with VerticalScroll():
                     yield from self.actions(('Rescan ports','ports'),('Check USB','check_usb'),('Firmware','firmware'),('Device screen','screen'),('Companion packs','packs'),('Connect PC','connect_pc'))
+                    yield from self.actions(('Doctor','doctor'),)
                     yield Static('',id='device-content',classes='panel',markup=False)
             with TabPane('5 Settings',id='settings'):
                 with VerticalScroll():
                     yield from self.actions(('Start host','start'),('Stop host','stop'))
                     yield from self.actions(('Edit settings','settings'),('Recent host log','log'),('Recover invalid settings','recover'))
+                    yield from self.actions(('Check for update','check_update'),('Install update','install_update'))
                     yield Static('',id='settings-content',classes='panel',markup=False)
         yield Static('',id='notice',markup=False)
         yield Static('1–5 Choose page | Tab Move focus | Arrows / PageUp / PageDown Scroll\n'
@@ -229,6 +232,8 @@ class TerminalApp(App):
         stamp='Unknown observation age' if device.get('age') is None else f"Observed {device['age']}s ago"
         update('#device-content',Group(facts_table('DEVICE',[('Board',device.get('board','Unknown')),('Port',device.get('port','Unknown')),
               ('Firmware',device.get('firmware','Unknown')),('Status',stamp)]),
+              Text('\nThe display firmware differs from this host ('+HOST_VERSION+'). Use Firmware > Application update.',style='bold #ffaa00')
+              if firmware_matches(device.get('firmware')) is False else Text(''),
               Text('\nStatus comes from the existing host. No second USB connection is opened.',style='#a5adb7')))
         update('#overview-device',device_panel(device,value['connection']))
         update('#nova-panel',nova_panel(value['agents'],image_rows=max(2,top_height-8)))
@@ -259,12 +264,13 @@ class TerminalApp(App):
             if action=='export-history':fields.append(('path','New CSV output file','text','',None))
             self.form('LOCAL HISTORY',fields,'history_report' if action=='history-report' else 'export_history')
         elif action=='diagnostics':self.form('EXPORT DIAGNOSTICS',[('path','New JSON output file','text','',None)],action)
-        elif action in ('clear_history','recover','codex_setup','connect_pc'):
-            words={'clear_history':'CLEAR','recover':'RESET','codex_setup':'SETUP','connect_pc':'CONNECT'}
+        elif action in ('clear_history','recover','codex_setup','connect_pc','install_update'):
+            words={'clear_history':'CLEAR','recover':'RESET','codex_setup':'SETUP','connect_pc':'CONNECT','install_update':'UPDATE'}
             notes={'clear_history':'Clear local history after stopping the owned writer. Collection preferences are retained.',
                    'recover':'Recover only invalid settings; preserve a private backup of the original.',
                    'codex_setup':'Open official installation/sign-in in a separate terminal. No model turn is started.',
-                   'connect_pc':'Open MENU > SETTINGS > CONNECT PC on the physical display and tap CONNECT PC there. This operation pauses and restores the host. Approval stays disabled.'}
+                   'connect_pc':'Open MENU > SETTINGS > CONNECT PC on the physical display and tap CONNECT PC there. This operation pauses and restores the host. Approval stays disabled.',
+                   'install_update':'Download the newest published release, verify its checksum and replace this folder after NOVA closes. Settings, history, hooks and the limitbuddy command are kept. The previous version stays beside it.'}
             self.form(action.replace('_',' ').upper(),[],action,notes[action],confirm=words[action])
         else:self.dispatch(action,{})
 
@@ -293,6 +299,8 @@ class TerminalApp(App):
             values.clear();self.operation_busy=False
             for button in self.screen_stack[0].query(Button):button.disabled=False
         if not self.ready():return
+        if result.get('exit'):
+            self.exit();return
         if self.latest:
             if action in ('start','stop'):self.latest['running']=action=='start'
             for key,value in preferences.items():
@@ -363,10 +371,14 @@ def main(argv=None):
     parser.add_argument('--version',action='version',version=HOST_VERSION)
     parser.add_argument('--root',type=Path,help='Existing LimitBuddy application directory')
     parser.add_argument('--check',action='store_true',help='Headless UI smoke check using synthetic data')
+    parser.add_argument('--check-update',action='store_true',help='Report whether a newer published release exists')
     bridge=parser.add_mutually_exclusive_group()
     bridge.add_argument('--ingest',choices=tuple(PROVIDERS),help='Read cumulative numeric provider telemetry from stdin')
     bridge.add_argument('--claude-statusline',action='store_true',help='Read documented Claude quota fields from stdin')
     args=parser.parse_args(argv)
+    if args.check_update:
+        from self_update import main as check_update
+        return check_update()
     if args.ingest or args.claude_statusline:
         from aim_control import main as control_main
         return control_main(['--ingest',args.ingest] if args.ingest else ['--claude-statusline'])
