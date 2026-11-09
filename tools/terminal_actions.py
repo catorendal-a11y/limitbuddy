@@ -19,10 +19,13 @@ def require(value,word):
 
 class TerminalActions:
     def __init__(self,root,comparison=None):
-        self.root=Path(root);self.prepared=None;self.comparison=comparison
+        self.root=Path(root)
+        self.prepared=None
+        self.comparison=comparison
 
     def execute(self,action,values=None):
-        values=values or {};lines=[]
+        values=values or {}
+        lines=[]
         try:config=control.local_config(self.root)
         except (ValueError,OSError):
             if action!='recover':raise
@@ -46,7 +49,8 @@ class TerminalActions:
             if 'usb_permissions' in options:raise ValueError('Production approval settings are not enabled here')
             desktop.save_settings(self.root,values['board'],values['providers'],values['port'],int(values['interval']),
                 key=values.get('key',''),clear_key=values.get('clear_key',False),options=options)
-            self.prepared=None;emit('Settings saved. Unchanged credentials were preserved.')
+            self.prepared=None
+            emit('Settings saved. Unchanged credentials were preserved.')
         elif action=='ports':
             result['ports']=[safe_text(port.device,40) for port in islice(control.list_ports.comports(),64)]
         elif action=='check_usb':desktop.check_connection(self.root,emit)
@@ -55,7 +59,8 @@ class TerminalActions:
             result['providers']=setup_report(self.root)
         elif action in ('link_events','unlink_events','link_quota','unlink_quota'):
             require(values.get('confirm'),'LINK')
-            provider=values.get('provider');remove=action.startswith('unlink')
+            provider=values.get('provider')
+            remove=action.startswith('unlink')
             if provider not in ('codex','claude','zcode') or (not remove and provider not in config['providers']):
                 raise ValueError('Select and save this provider first')
             import provider_setup
@@ -70,13 +75,16 @@ class TerminalActions:
             desktop.open_integrations(self.root,codex_only=True)
             emit('Official Codex setup opened in a separate terminal for installation/sign-in.')
         elif action=='clear_history':
-            require(values.get('confirm'),'CLEAR');desktop.clear_local_history(self.root,emit)
+            require(values.get('confirm'),'CLEAR')
+            desktop.clear_local_history(self.root,emit)
         elif action=='recover':
-            require(values.get('confirm'),'RESET');desktop.reset_invalid_settings(self.root,emit)
+            require(values.get('confirm'),'RESET')
+            desktop.reset_invalid_settings(self.root,emit)
         elif action=='prepare_flash':
             kind=values.get('kind')
             if kind not in ('install','update'):raise ValueError('Choose install or update')
-            board=config['board'];port,_=desktop.prepare_flash(self.root,board,kind)
+            board=config['board']
+            port,_=desktop.prepare_flash(self.root,board,kind)
             self.prepared=(board,kind,port)
             result['prepared']=dict(board=board,kind=kind,port=port)
             emit('Firmware checked. Confirm the exact board, operation and port before writing.')
@@ -98,7 +106,8 @@ class TerminalActions:
             if report.get('error'):raise ValueError('History unavailable')
             if action=='history_report':result['history']=report
             else:
-                stream=io.StringIO(newline='');writer=csv.writer(stream)
+                stream=io.StringIO(newline='')
+                writer=csv.writer(stream)
                 writer.writerow(['metric','provider','observed_utc','value','window_minutes','kind','reset_epoch','local_date'])
                 for row in report['tokens']:
                     writer.writerow(['observed_tokens',row['provider'],'',row['total'],'','','',row['date']])
@@ -107,26 +116,32 @@ class TerminalActions:
                 for row in report.get('daily_agents',[]):
                     for field in ('sessions','activeSeconds','completedTurns','failedTurns','createdTasks','startedTasks','completedTasks','failedTasks'):
                         if row.get(field) is not None:writer.writerow([field,row['provider'],'',row[field],'','','',row['date']])
-                self.export(values['path'],stream.getvalue().encode('utf-8'));emit('Numeric history exported.')
+                self.export(values['path'],stream.getvalue().encode('utf-8'))
+                emit('Numeric history exported.')
         elif action in ('packs','import_pack','select_pack','builtin','remove_pack'):
             import companion_packages as packs
             if action=='import_pack':
                 require(values.get('confirm'),'IMPORT')
-                pack=packs.install(self.root,Path(values['path']));packs.select(self.root,pack.id)
+                pack=packs.install(self.root,Path(values['path']))
+                packs.select(self.root,pack.id)
                 emit('Pack validated and selected; wait for the host activation receipt.')
             elif action in ('select_pack','builtin'):
                 packs.select(self.root,'' if action=='builtin' else values['id'])
                 emit('Selection saved. Device activation is separate; check host status.')
             elif action=='remove_pack':
-                require(values.get('confirm'),'REMOVE');packs.remove(self.root,values['id'])
+                require(values.get('confirm'),'REMOVE')
+                packs.remove(self.root,values['id'])
                 emit('Unused local pack removed.')
-            rows=[];paths=list(islice(packs.directory(self.root,create=False).glob('*.pack'),17))
+            rows=[]
+            paths=list(islice(packs.directory(self.root,create=False).glob('*.pack'),17))
             if len(paths)>16:raise ValueError('Companion library capacity exceeded')
             for path in sorted(paths):
                 try:
-                    pack=packs.load(self.root,path.stem);rows.append(dict(id=pack.id,name=safe_text(pack.name,64)))
+                    pack=packs.load(self.root,path.stem)
+                    rows.append(dict(id=pack.id,name=safe_text(pack.name,64)))
                 except (ValueError,OSError):emit('An invalid local pack was omitted.')
-            result['packs']=rows;result['selected']=packs.selected(self.root)
+            result['packs']=rows
+            result['selected']=packs.selected(self.root)
             health=read_status(self.root,{p.pid for p in control.owned_hosts(self.root)}) or {}
             selected_device=health.get('board')==config.get('board') and config.get('port') in ('auto',health.get('port'))
             companion=health.get('companion',{})
@@ -150,7 +165,8 @@ class TerminalActions:
                     emit(release['tag']+' is available'+(' (pre-release)' if release['prerelease'] else '')+'. Use Install update.')
                 else:
                     staged=self_update.stage(self.root,release,emit=emit)
-                    self_update.finish(self.root,staged,emit=emit);result['exit']=True
+                    self_update.finish(self.root,staged,emit=emit)
+                    result['exit']=True
             except self_update.UpdateError as error:emit(str(error))
         elif action=='connect_pc':
             require(values.get('confirm'),'CONNECT')
@@ -165,7 +181,8 @@ class TerminalActions:
                 while time.monotonic()<deadline:
                     frame=receive(self.root,nonce)
                     if frame:
-                        result['pixels']=frame[0];break
+                        result['pixels']=frame[0]
+                        break
                     time.sleep(.5)
                 else:raise TimeoutError('Screen capture timed out')
             finally:cancel(self.root,nonce)
@@ -182,6 +199,9 @@ class TerminalActions:
         descriptor,temporary=temporary_file(path.parent)
         try:
             with os.fdopen(descriptor,'wb') as stream:
-                protect(temporary);stream.write(content);stream.flush();os.fsync(stream.fileno())
+                protect(temporary)
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
             os.link(temporary,path)  # Atomic exclusive publication; a concurrent export is never overwritten.
         finally:Path(temporary).unlink(missing_ok=True)

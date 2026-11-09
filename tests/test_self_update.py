@@ -1,4 +1,5 @@
 import hashlib
+import http.client
 import io
 import os
 from pathlib import Path
@@ -10,13 +11,19 @@ from unittest.mock import patch
 import urllib.error
 import zipfile
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+sys.path[:0] = [str(Path(__file__).resolve().parents[1] / folder) for folder in ('tools', 'scripts')]
 import doctor
 import host_security
 import self_update as update
+import sign_release
 
 TAG = 'v1.19.1-rc29'
 BASE = host_security.UPDATE_DOWNLOAD_PREFIX + TAG + '/'
+KEY = Ed25519PrivateKey.generate()
+PUBLIC = KEY.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex()
 
 
 def package(files=None, prefix=None):
@@ -32,9 +39,10 @@ def package(files=None, prefix=None):
 
 def release_list(*items):
     import json
-    return json.dumps([dict(tag_name=tag, draft=draft, prerelease=True, assets=[
+    return json.dumps([dict(tag_name=tag, draft=draft, prerelease='-rc' in tag, assets=[
         dict(name=update.package_name(tag), browser_download_url=host_security.UPDATE_DOWNLOAD_PREFIX + tag + '/' + update.package_name(tag)),
-        dict(name='SHA256SUMS.txt', browser_download_url=host_security.UPDATE_DOWNLOAD_PREFIX + tag + '/SHA256SUMS.txt')])
+        dict(name='SHA256SUMS.txt', browser_download_url=host_security.UPDATE_DOWNLOAD_PREFIX + tag + '/SHA256SUMS.txt'),
+        dict(name='SHA256SUMS.txt.sig', browser_download_url=host_security.UPDATE_DOWNLOAD_PREFIX + tag + '/SHA256SUMS.txt.sig')])
         for tag, draft in items]).encode()
 
 
@@ -52,6 +60,17 @@ class ReleaseCheckTests(unittest.TestCase):
         self.assertEqual(release['tag'], 'v1.19.1-rc29')
         self.assertTrue(release['package_url'].startswith(BASE))
         self.assertIsNone(update.check(read=lambda url, limit: data, current='v1.19.1-rc29'))
+
+    def test_release_candidates_are_offered_only_to_release_candidates(self):
+        data = release_list(('v1.20.0-rc1', False), ('v1.19.2', False))
+        self.assertEqual(update.check(read=lambda url, limit: data, current='v1.19.1')['tag'], 'v1.19.2')
+        self.assertEqual(update.check(read=lambda url, limit: data, current='v1.19.1-rc28')['tag'], 'v1.20.0-rc1')
+
+    def test_unsigned_release_is_ignored(self):
+        import json
+        data = json.loads(release_list((TAG, False)))
+        del data[0]['assets'][2]
+        self.assertIsNone(update.check(read=lambda url, limit: json.dumps(data).encode(), current='v1.19.1-rc28'))
 
     def test_assets_outside_this_repository_release_are_ignored(self):
         import json
@@ -79,11 +98,14 @@ class ReleaseCheckTests(unittest.TestCase):
 
 
 class StageTests(unittest.TestCase):
-    def stage(self, data, digest=None):
+    def stage(self, data, digest=None, signature=None):
         sums = f"{digest or hashlib.sha256(data).hexdigest()}  {update.package_name(TAG)}\n".encode()
-        reads = {BASE + 'SHA256SUMS.txt': sums, BASE + update.package_name(TAG): data}
-        release = dict(tag=TAG, package_url=BASE + update.package_name(TAG), sums_url=BASE + 'SHA256SUMS.txt')
-        with patch.object(update, 'installed_package', side_effect=lambda root: Path(root)):
+        reads = {BASE + 'SHA256SUMS.txt': sums, BASE + update.package_name(TAG): data,
+                 BASE + 'SHA256SUMS.txt.sig': KEY.sign(sums) if signature is None else signature}
+        release = dict(tag=TAG, package_url=BASE + update.package_name(TAG), sums_url=BASE + 'SHA256SUMS.txt',
+                       signature_url=BASE + 'SHA256SUMS.txt.sig')
+        with patch.object(update, 'installed_package', side_effect=lambda root: Path(root)), \
+                patch.object(update, 'UPDATE_PUBLIC_KEY', PUBLIC):
             return update.stage(self.root, release, read=lambda url, limit: reads[url], emit=lambda _: None)
 
     def setUp(self):
@@ -100,6 +122,11 @@ class StageTests(unittest.TestCase):
         with self.assertRaises(update.UpdateError): self.stage(package(), digest='0' * 64)
         self.assertFalse(self.root.with_name('app.next').exists())
 
+    def test_wrong_signature_changes_nothing(self):
+        for signature in (bytes(64), b'short', b''):
+            with self.subTest(), self.assertRaises(update.UpdateError): self.stage(package(), signature=signature)
+            self.assertFalse(self.root.with_name('app.next').exists())
+
     def test_unsafe_or_incomplete_packages_are_rejected_and_removed(self):
         prefix = update.package_name(TAG)[:-4] + '/'
         for data in (package({'../escape.txt': b'x'}), package(prefix='other/'),
@@ -112,6 +139,20 @@ class StageTests(unittest.TestCase):
         foreign = self.root.with_name('app.next'); foreign.mkdir(); (foreign / 'keep.txt').write_text('mine')
         with self.assertRaises(update.UpdateError): self.stage(package())
         self.assertEqual((foreign / 'keep.txt').read_text(), 'mine')
+
+    def test_private_data_left_by_a_failed_swap_is_never_deleted(self):
+        leftover = self.root.with_name('app.next'); (leftover / 'tools').mkdir(parents=True)
+        (leftover / update.MARKER).write_text(TAG); (leftover / 'tools/aim_host.json').write_text('{"mine": true}')
+        with self.assertRaises(update.UpdateError): self.stage(package())
+        self.assertEqual((leftover / 'tools/aim_host.json').read_text(), '{"mine": true}')
+
+    def test_download_failure_is_a_short_safe_message(self):
+        def fail(url, limit): raise http.client.IncompleteRead(b'secret-host')
+        release = dict(tag=TAG, package_url=BASE + 'a.zip', sums_url=BASE + 'SHA256SUMS.txt', signature_url=BASE + 'SHA256SUMS.txt.sig')
+        with patch.object(update, 'installed_package', side_effect=lambda root: Path(root)), \
+                self.assertRaises(update.UpdateError) as raised:
+            update.stage(self.root, release, read=fail, emit=lambda _: None)
+        self.assertNotIn('secret-host', str(raised.exception))
 
     def test_swap_command_runs_a_copy_with_explicit_arguments(self):
         staged = self.stage(package())
@@ -144,6 +185,20 @@ class SwapScriptTests(unittest.TestCase):
             self.assertEqual(Path(folder, 'app.previous', 'old.txt').read_text(), 'old')
             self.assertFalse(Path(folder, 'app.previous', 'tools/aim_host.json').exists())
 
+    def test_failed_private_move_puts_everything_back(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root, staged = Path(folder, 'app'), Path(folder, 'app.next')
+            (root / 'tools').mkdir(parents=True); staged.mkdir()
+            (root / '.env').write_text('KEY=mine'); (root / 'tools/aim_host.json').write_text('{}')
+            # A file where the tools folder belongs stops the move after .env has already gone.
+            (staged / 'tools').write_text('blocker'); (staged / update.MARKER).write_text(TAG)
+            script = Path(__file__).resolve().parents[1] / 'tools/apply_update.ps1'
+            subprocess.run([host_security.powershell_executable(), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                            '-File', str(script), '-Root', str(root), '-Staged', str(staged), '-Log', str(Path(folder, 'u.log'))], check=True, timeout=60)
+            self.assertIn('Update failed', Path(folder, 'u.log').read_text())
+            self.assertEqual((root / '.env').read_text(), 'KEY=mine')
+            self.assertFalse((staged / '.env').exists())
+
     def test_wrong_staged_folder_changes_nothing(self):
         with tempfile.TemporaryDirectory() as folder:
             root, other = Path(folder, 'app'), Path(folder, 'other')
@@ -155,6 +210,49 @@ class SwapScriptTests(unittest.TestCase):
             self.assertIn('Update failed', Path(folder, 'u.log').read_text())
             self.assertTrue((root / 'tools/aim_host.json').is_file())
             self.assertFalse(Path(folder, 'app.previous').exists())
+
+
+class SignReleaseTests(unittest.TestCase):
+    def test_signature_verifies_and_a_key_that_installations_do_not_trust_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(sign_release, 'UPDATE_PUBLIC_KEY', PUBLIC), \
+                patch.object(update, 'UPDATE_PUBLIC_KEY', PUBLIC):
+            sums = Path(folder, 'SHA256SUMS.txt'); sums.write_bytes(b'data')
+            sign_release.sign(sums, KEY.private_bytes_raw().hex())
+            update.verify_signature(b'data', Path(folder, 'SHA256SUMS.txt.sig').read_bytes())
+            with self.assertRaises(SystemExit):
+                sign_release.sign(sums, Ed25519PrivateKey.generate().private_bytes_raw().hex())
+
+    def checksums_from_github(self, content, uploads):
+        def run(command, check):
+            if command[2] == 'download':
+                Path(command[command.index('--dir') + 1], 'SHA256SUMS.txt').write_bytes(content)
+            else:
+                uploads.append(Path(command[4]).read_bytes())
+        return patch.object(sign_release.subprocess, 'run', side_effect=run)
+
+    def test_release_signature_covers_the_downloaded_checksums(self):
+        content, uploads = f"{'0' * 64}  {update.package_name(TAG)}\n".encode(), []
+        with tempfile.TemporaryDirectory() as folder, self.checksums_from_github(content, uploads), \
+                patch.object(sign_release, 'UPDATE_PUBLIC_KEY', PUBLIC), patch.object(update, 'UPDATE_PUBLIC_KEY', PUBLIC):
+            key = Path(folder, 'update.key'); key.write_text(KEY.private_bytes_raw().hex())
+            sign_release.sign_published_checksums(TAG, key)
+            update.verify_signature(content, uploads[0])
+
+    def test_checksums_for_another_release_are_not_signed(self):
+        uploads = []
+        with tempfile.TemporaryDirectory() as folder, self.checksums_from_github(f"{'0' * 64}  other.zip\n".encode(), uploads), \
+                patch.object(sign_release, 'UPDATE_PUBLIC_KEY', PUBLIC):
+            key = Path(folder, 'update.key'); key.write_text(KEY.private_bytes_raw().hex())
+            with self.assertRaises(SystemExit): sign_release.sign_published_checksums(TAG, key)
+        self.assertEqual(uploads, [])
+
+    def test_new_key_is_created_once_and_only_its_public_half_is_returned(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, 'keys/update.key')
+            public = sign_release.generate_key(path)
+            self.assertRegex(path.read_text(), '^[0-9a-f]{64}$')
+            self.assertNotEqual(public, path.read_text())
+            with self.assertRaises(SystemExit): sign_release.generate_key(path)
 
 
 class DoctorTests(unittest.TestCase):
@@ -174,6 +272,8 @@ class DoctorTests(unittest.TestCase):
             Path(folder, 'limitbuddy.cmd').write_text('rem AI_MONITOR_TERMINAL_OWNER=' + marker + '\n')
             self.assertTrue(doctor.command_owner(root, folder))
             self.assertFalse(doctor.command_owner(Path(folder, 'other'), folder))
+            Path(folder, 'limitbuddy.cmd').write_text('rem AI_MONITOR_TERMINAL_OWNER=')
+            self.assertFalse(doctor.command_owner(root, folder))
 
     def test_report_marks_problems_without_printing_secrets(self):
         config = {'providers': ['codex', 'claude'], 'start_host_at_login': True, 'zai_key': 'secret-key'}

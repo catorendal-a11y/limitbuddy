@@ -3,13 +3,12 @@
 Read-only: the token is read in the quota worker, never logged or stored. Near expiry only the
 official `claude auth status` renews it; LimitBuddy never writes credentials.
 """
-import json
 import os
 import subprocess
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from claude_paths import config_root

@@ -6,6 +6,7 @@ history and companion packs move into the new version after NOVA closes; nothing
 out of the folder. The previous version stays beside it as <folder>.previous.
 """
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -17,7 +18,7 @@ import sys
 import tempfile
 import zipfile
 
-from host_security import UPDATE_DOWNLOAD_PREFIX, UPDATE_RELEASES_URL, open_update_request, powershell_executable
+from host_security import UPDATE_DOWNLOAD_PREFIX, UPDATE_PUBLIC_KEY, UPDATE_RELEASES_URL, open_update_request, powershell_executable
 from project_version import HOST_VERSION
 
 MAX_LIST_BYTES = 1024 * 1024
@@ -27,6 +28,9 @@ MAX_EXTRACTED_BYTES = 800 * 1024 * 1024
 MAX_MEMBERS = 20000
 MARKER = '.limitbuddy-staged'
 SUMS = 'SHA256SUMS.txt'
+SIGNATURE = SUMS + '.sig'
+SIGNATURE_BYTES = 64
+FINAL_RELEASE = 1 << 30
 # Local-only data that belongs to this installation (see .gitignore); moved, never copied.
 PRIVATE_ITEMS = ('.env', 'tools/aim_host.json', 'tools/aim_host.status.json', 'tools/aim_host.log',
                  'tools/aim_host.log.1', 'tools/activity', 'tools/companions', 'tools/permission-endpoint.json')
@@ -43,7 +47,7 @@ def release_key(tag):
     if not match:
         return None
     major, minor, patch, candidate = match.groups()
-    return int(major), int(minor), int(patch), int(candidate) if candidate else 1 << 30
+    return int(major), int(minor), int(patch), int(candidate) if candidate else FINAL_RELEASE
 
 
 def package_name(tag):
@@ -59,16 +63,17 @@ def read_limited(url, limit):
 
 
 def check(read=read_limited, current=HOST_VERSION):
-    """Newest published release newer than this one, or None."""
+    """Newest signed release newer than this one, or None. Only a release candidate is offered candidates."""
     try:
         releases = json.loads(read(UPDATE_RELEASES_URL, MAX_LIST_BYTES))
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, http.client.HTTPException) as error:
         raise UpdateError('GitHub could not be reached. Check the connection and retry.') from error
     if not isinstance(releases, list):
         raise UpdateError('GitHub returned an unexpected release list.')
     newest, newest_key = None, release_key(current)
     if newest_key is None:
         raise UpdateError('This installation has no comparable version.')
+    stable_channel = newest_key[3] == FINAL_RELEASE
     for release in releases[:20]:
         if not isinstance(release, dict) or release.get('draft') is not False:
             continue
@@ -76,16 +81,28 @@ def check(read=read_limited, current=HOST_VERSION):
         key = release_key(tag)
         if key is None or key <= newest_key:
             continue
-        assets = {asset.get('name'): asset for asset in release.get('assets', [])[:64] if isinstance(asset, dict)}
-        package, sums = assets.get(package_name(tag)), assets.get(SUMS)
-        if not package or not sums:
+        if stable_channel and (key[3] != FINAL_RELEASE or release.get('prerelease') is not False):
             continue
-        urls = (package.get('browser_download_url'), sums.get('browser_download_url'))
+        assets = {asset.get('name'): asset for asset in release.get('assets', [])[:64] if isinstance(asset, dict)}
+        package, sums, signature = assets.get(package_name(tag)), assets.get(SUMS), assets.get(SIGNATURE)
+        if not package or not sums or not signature:
+            continue
+        urls = (package.get('browser_download_url'), sums.get('browser_download_url'), signature.get('browser_download_url'))
         if not all(isinstance(url, str) and url.startswith(UPDATE_DOWNLOAD_PREFIX + tag + '/') for url in urls):
             continue
-        newest, newest_key = dict(tag=tag, package_url=urls[0], sums_url=urls[1],
+        newest, newest_key = dict(tag=tag, package_url=urls[0], sums_url=urls[1], signature_url=urls[2],
                                   prerelease=release.get('prerelease') is True), key
     return newest
+
+
+def verify_signature(sums, signature):
+    """The checksum list names the tagged package, so a valid signature binds it to this release."""
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(UPDATE_PUBLIC_KEY)).verify(signature, sums)
+    except (InvalidSignature, ValueError) as error:
+        raise UpdateError('The release signature is not valid; nothing was changed.') from error
 
 
 def expected_digest(sums, name):
@@ -140,10 +157,21 @@ def stage(root, release, read=read_limited, emit=print):
     if staged.exists():
         if not (staged / MARKER).is_file():
             raise UpdateError('A folder named like the update already exists; nothing was changed.')
+        # A rollback that failed leaves the only copy of the settings here.
+        if any((staged / item).exists() for item in PRIVATE_ITEMS) or any(any(staged.glob(pattern)) for pattern in PRIVATE_PATTERNS):
+            raise UpdateError('A failed update left private data beside this folder; nothing was changed.')
         shutil.rmtree(staged)
     emit('Downloading ' + release['tag'] + '...')
-    sums = read(release['sums_url'], MAX_SUMS_BYTES)
-    package = read(release['package_url'], MAX_PACKAGE_BYTES)
+    try:
+        sums = read(release['sums_url'], MAX_SUMS_BYTES)
+        signature = read(release['signature_url'], SIGNATURE_BYTES)
+    except (OSError, http.client.HTTPException) as error:
+        raise UpdateError('The download failed. Check the connection and retry.') from error
+    verify_signature(sums, signature)
+    try:
+        package = read(release['package_url'], MAX_PACKAGE_BYTES)
+    except (OSError, http.client.HTTPException) as error:
+        raise UpdateError('The download failed. Check the connection and retry.') from error
     if hashlib.sha256(package).hexdigest() != expected_digest(sums, package_name(release['tag'])):
         raise UpdateError('The download does not match its published checksum; nothing was changed.')
     emit('Checksum verified. Extracting...')

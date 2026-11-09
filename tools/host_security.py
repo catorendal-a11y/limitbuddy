@@ -36,6 +36,8 @@ def open_provider_request(request):
 # credentials, and GitHub may redirect an asset only to its own asset hosts over HTTPS.
 UPDATE_RELEASES_URL = 'https://api.github.com/repos/catorendal-a11y/limitbuddy/releases?per_page=10'
 UPDATE_DOWNLOAD_PREFIX = 'https://github.com/catorendal-a11y/limitbuddy/releases/download/'
+# Ed25519 key that must have signed SHA256SUMS.txt; the private half exists only as a release secret.
+UPDATE_PUBLIC_KEY = '521bdf199a54c63cfb725af445796adffb1774cdd8ff8f3bf47e332aca63c7c8'
 UPDATE_ASSET_HOSTS = frozenset(('release-assets.githubusercontent.com', 'objects.githubusercontent.com'))
 
 

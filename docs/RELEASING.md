@@ -60,4 +60,6 @@ flowchart LR
 | `windows` | Python regressions, builds the x64 terminal ZIP, runs the package test, writes `SHA256SUMS.txt` and current release notes |
 | `publish` | Only job with write permission: verifies ZIP vs checksum, attests both, creates a draft; no repository checkout or code execution ([permissions](GITHUB_SECURITY.md)) |
 
-Review and publish the draft explicitly. Never replace immutable published assets. Retiring old EXE releases is a separate owner action; keep source tags and verification evidence.
+Review the draft, then sign it on the maintainer's PC so installed copies will offer it: `python scripts/sign_release.py vX.Y.Z --key <key file>`. The key never goes to GitHub; keep an offline backup, because releases signed with a new key need one bridging release signed with the old one. A release without `SHA256SUMS.txt.sig` is never offered by **Install update**.
+
+Publish the draft explicitly. Never replace immutable published assets. Retiring old EXE releases is a separate owner action; keep source tags and verification evidence.

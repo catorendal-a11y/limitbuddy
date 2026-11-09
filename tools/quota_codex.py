@@ -1,5 +1,4 @@
 """Codex (ChatGPT plan) quota from the local Codex CLI login; the token stays in memory."""
-import json
 import urllib.error
 import urllib.request
 

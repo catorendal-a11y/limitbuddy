@@ -9,7 +9,6 @@ param(
     [string]$Log = (Join-Path ([IO.Path]::GetTempPath()) 'limitbuddy-update.log')
 )
 $ErrorActionPreference = 'Stop'
-$log = $Log
 function Note([string]$Message) { Add-Content -LiteralPath $log -Value ((Get-Date -Format s) + ' ' + $Message) }
 function Retry([scriptblock]$Action) {
     # Hooks may briefly hold a file in the folder; never give up on the first sharing violation.
@@ -45,7 +44,8 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $Staged '.limitbuddy-staged'))) { throw 'Staged update is missing' }
     if ($WaitPid -gt 0) { Wait-Process -Id $WaitPid -Timeout 300 -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $previous) { Retry { Remove-Item -LiteralPath $previous -Recurse -Force } }
-    Move-Private $Root $Staged; $moved = $true
+    $moved = $true  # before the move: a failure halfway must still bring the moved items back
+    Move-Private $Root $Staged
     Retry { Rename-Item -LiteralPath $Root -NewName (Split-Path -Leaf $previous) }; $retired = $true
     Retry { Rename-Item -LiteralPath $Staged -NewName (Split-Path -Leaf $Root) }
     Remove-Item -LiteralPath (Join-Path $Root '.limitbuddy-staged') -Force
@@ -53,8 +53,10 @@ try {
 } catch {
     Note ('Update failed: ' + $_.Exception.Message)
     # Put everything back where it was; the previous version keeps working.
-    if ($retired -and -not (Test-Path -LiteralPath $Root)) { Rename-Item -LiteralPath $previous -NewName (Split-Path -Leaf $Root) }
-    if ($moved) { Move-Private $Staged $Root }
+    try {
+        if ($retired -and -not (Test-Path -LiteralPath $Root)) { Retry { Rename-Item -LiteralPath $previous -NewName (Split-Path -Leaf $Root) } }
+        if ($moved) { Move-Private $Staged $Root }
+    } catch { Note ('Rollback failed: ' + $_.Exception.Message) }
 }
 if ($StartHost) {
     Start-Process -FilePath (Join-Path $Root 'runtime\pythonw.exe') -WorkingDirectory $Root -WindowStyle Hidden `

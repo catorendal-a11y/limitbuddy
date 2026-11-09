@@ -33,10 +33,9 @@ def command_owner(root, bin_dir=None):
     marker = 'AI_MONITOR_TERMINAL_OWNER='
     if marker not in text:
         return False
-    encoded = text.split(marker, 1)[1].split()[0]
     try:
-        owner = base64.b64decode(encoded).decode('utf-8')
-    except (ValueError, UnicodeDecodeError):
+        owner = base64.b64decode(text.split(marker, 1)[1].split()[0]).decode('utf-8')
+    except (ValueError, IndexError, UnicodeDecodeError):
         return False
     return os.path.normcase(os.path.normpath(owner)) == os.path.normcase(os.path.normpath(str(root)))
 
