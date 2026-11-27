@@ -15,7 +15,7 @@ psutil==7.2.2
 pycparser==3.12
 Pygments==2.21.0
 pyserial==3.5
-PyYAML==6.0.3
+PyYAML==6.0.4
 reedsolo==1.7.0
 rich==15.0.0
 rich-click==1.9.9
